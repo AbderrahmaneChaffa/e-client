@@ -1,17 +1,21 @@
 <?php
 
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\FactureController;
+use App\Http\Controllers\PaiementController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return view('auth.login');
 });
-Route::middleware(['auth','verified'])->group(function () {
+Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::middleware('role:admin')->group(function () {
         Route::get('/admin/dashboard', [DashboardController::class, 'index'])
             ->name('admin.dashboard');
+        Route::get('/factures', [FactureController::class, 'index'])->name('admin.factures.index');
+        Route::get('/paiements', [PaiementController::class, 'index'])->name('admin.paiements.index');
     });
 
     Route::middleware('role:client')->group(function () {
@@ -19,7 +23,6 @@ Route::middleware(['auth','verified'])->group(function () {
             ->name('client.dashboard');
     });
 });
-
 
 
 

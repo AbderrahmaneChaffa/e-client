@@ -53,4 +53,9 @@ class Facture extends Model
     {
         return $this->hasMany(Paiement::class);
     }
+
+    public function navire(): BelongsTo
+    {
+        return $this->belongsTo(Navire::class);
+    }
 }

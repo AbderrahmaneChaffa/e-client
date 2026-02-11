@@ -10,9 +10,25 @@ class PaiementController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        //
+        // On charge la facture ET le client lié à cette facture en 2 requêtes seulement
+        $query = Paiement::with(['facture.client']);
+
+        // Filtre par référence de reçu ou chèque
+        if ($request->filled('search')) {
+            $query->where('reference_recu', 'like', '%' . $request->search . '%')
+                ->orWhere('numero_cheque', 'like', '%' . $request->search . '%');
+        }
+
+        // Filtre par banque
+        if ($request->filled('banque')) {
+            $query->where('banque', $request->banque);
+        }
+
+        $paiements = $query->orderBy('date_paiement', 'desc')->paginate(20)->withQueryString();
+
+        return view('admins.paiements.index', compact('paiements'));
     }
 
     /**
