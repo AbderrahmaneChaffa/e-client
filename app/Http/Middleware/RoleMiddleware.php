@@ -17,7 +17,7 @@ class RoleMiddleware
      */
     public function handle($request, Closure $next, $role)
     {
-        if (!Auth::check() || Auth::user()->role !==  UserRole::from($role)) {
+        if (!Auth::check() || Auth::user()->role !== UserRole::from(strtolower($role))) {
             abort(403);
         }
 

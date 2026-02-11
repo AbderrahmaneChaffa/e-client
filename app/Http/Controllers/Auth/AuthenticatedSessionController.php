@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 use App\Models\User;
+use App\UserRole;
 
 class AuthenticatedSessionController extends Controller
 {
@@ -36,7 +37,9 @@ class AuthenticatedSessionController extends Controller
         $request->authenticate();
         $request->session()->regenerate();
 
-        if (Auth::user()->role === 'Admin') {
+        $user = Auth::user();
+
+        if ($user->role === UserRole::ADMIN) {
             return redirect()->route('admin.dashboard');
         }
 

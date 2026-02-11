@@ -1,26 +1,27 @@
 <?php
 
+use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
-
-
-Route::middleware(['auth'])->group(function () {
-
-    Route::middleware('role:Admin')->group(function () {
-        Route::get('/admin/dashboard', fn () => view('admins.dashboard'))
-            ->name('admin.dashboard');
-    });
-
-    Route::middleware('role:Client')->group(function () {
-        Route::get('/client/dashboard', fn () => view('clients.dashboard'))
-            ->name('client.dashboard');
-    });
-
-});
 
 Route::get('/', function () {
     return view('auth.login');
 });
+Route::middleware(['auth','verified'])->group(function () {
+
+    Route::middleware('role:admin')->group(function () {
+        Route::get('/admin/dashboard', [DashboardController::class, 'index'])
+            ->name('admin.dashboard');
+    });
+
+    Route::middleware('role:client')->group(function () {
+        Route::get('/client/dashboard', fn() => view('clients.dashboard'))
+            ->name('client.dashboard');
+    });
+});
+
+
+
 
 Route::get('/dashboard', function () {
     return view('dashboard');
@@ -32,4 +33,4 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
-require __DIR__.'/auth.php';
+require __DIR__ . '/auth.php';
