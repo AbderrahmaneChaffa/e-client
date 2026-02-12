@@ -5,10 +5,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EPO - Administration</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+   
 
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 
 <body class="bg-gray-100 font-sans">
@@ -25,13 +26,13 @@
                     <i class="fa-solid fa-file-invoice mr-3"></i> Factures
                 </a>
                 <a href="{{route('admin.paiements.index')}}" class="flex items-center py-3 px-6 text-slate-300 hover:bg-slate-700">
-                    <i class="fa-solid fa-file-invoice mr-3"></i> Paiements
+                    <i class="fa-solid fa-credit-card mr-3"></i> Paiements
                 </a>
                 <a href="#" class="flex items-center py-3 px-6 text-slate-300 hover:bg-slate-700">
                     <i class="fa-solid fa-users mr-3"></i> Clients
                 </a>
 
-                <a href="#" class="flex items-center py-3 px-6 text-slate-300 hover:bg-slate-700">
+                <a href="{{route('admin.imports.index')}}" class="flex items-center py-3 px-6 text-slate-300 hover:bg-slate-700">
                     <i class="fa-solid fa-upload mr-3"></i> Import Excel
                 </a>
             </nav>
@@ -47,6 +48,21 @@
             </header>
 
             <main class="flex-1 overflow-y-auto p-8">
+                @if(session('success'))
+                <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
+                    {{ session('success') }}
+                </div>
+                @endif
+
+                @if($errors->any())
+                <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+                    <ul>
+                        @foreach($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+                @endif
                 @yield('content')
             </main>
         </div>

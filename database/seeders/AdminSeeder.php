@@ -17,7 +17,7 @@ class AdminSeeder extends Seeder
             'name' => 'Super Admin',
             'email' => 'admin@e-client.com',
             'password' => bcrypt('password'),
-            'role' => 'Admin',
+            'role' => 'admin',
         ]);
     }
 }

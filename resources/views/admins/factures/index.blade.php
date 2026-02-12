@@ -11,11 +11,11 @@
 
     <form method="GET" class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
         <input type="text" name="numero" value="{{ request('numero') }}" placeholder="N° Facture..." class="border-gray-300 rounded-lg text-sm">
-        
+
         <select name="client_id" class="border-gray-300 rounded-lg text-sm">
             <option value="">Tous les clients</option>
             @foreach($clients as $client)
-                <option value="{{ $client->id }}" {{ request('client_id') == $client->id ? 'selected' : '' }}>{{ $client->name }}</option>
+            <option value="{{ $client->id }}" {{ request('client_id') == $client->id ? 'selected' : '' }}>{{ $client->name }}</option>
             @endforeach
         </select>
 
@@ -52,12 +52,14 @@
                     <td class="p-4 border-b">
                         @if($facture->reste_a_payer <= 0)
                             <span class="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-bold">Payée</span>
-                        @else
+                            @else
                             <span class="bg-red-100 text-red-700 px-2 py-1 rounded-full text-xs font-bold">Impayée</span>
-                        @endif
+                            @endif
                     </td>
                     <td class="p-4 border-b text-center">
-                        <a href="#" class="text-gray-400 hover:text-blue-600 mx-1"><i class="fa-solid fa-eye"></i></a>
+                        <a href="{{ route('admin.factures.show', $facture) }}" class="text-gray-400 hover:text-blue-600 mx-1">
+                            <i class="fa-solid fa-eye"></i>
+                        </a>
                         <a href="#" class="text-gray-400 hover:text-green-600 mx-1"><i class="fa-solid fa-print"></i></a>
                     </td>
                 </tr>

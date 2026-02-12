@@ -64,7 +64,10 @@ class FactureController extends Controller
      */
     public function show(Facture $facture)
     {
-        //
+        // On charge tout ce qui est lié à cette facture spécifique
+        $facture->load(['client', 'navire', 'prestations', 'paiements']);
+
+        return view('admins.factures.show', compact('facture'));
     }
 
     /**

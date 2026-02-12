@@ -17,7 +17,7 @@ class ClientSeeder extends Seeder
             'name' => 'Client',
             'email' => 'client@e-client.com',
             'password' => bcrypt('password'),
-            'role' => 'Client',
+            'role' => 'client',
         ]);
     }
 }

@@ -11,7 +11,36 @@
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
     <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
         <h3 class="font-bold mb-4 text-gray-700">Évolution des encaissements (DA)</h3>
-        <canvas id="paymentChart" height="200"></canvas>
+        <canvas
+            id="paymentChart"
+            data-labels='@json($labels)'
+            data-amounts='@json($amounts)'>
+        </canvas>
+
+        <script>
+
+            document.addEventListener("DOMContentLoaded", () => {
+                const canvas = document.getElementById('paymentChart');
+
+                if (canvas) {
+                    new Chart(canvas, {
+                        type: 'line',
+                        data: {
+                            labels: JSON.parse(canvas.dataset.labels),
+                            datasets: [{
+                                label: 'Paiements Reçus',
+                                data: JSON.parse(canvas.dataset.amounts),
+                                borderColor: '#2563eb',
+                                backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                                fill: true,
+                                tension: 0.4
+                            }]
+                        }
+                    });
+                }
+            });
+        </script>
+
     </div>
 
     <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
@@ -37,24 +66,5 @@
             </table>
         </div>
     </div>
-
 </div>
-<script>
-    const ctx = document.getElementById('paymentChart').getContext('2d');
-
-    new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: [12, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(m => `Mois ${m}`),
-            datasets: [{
-                label: 'Paiements Reçus',
-                data: [12000, 15000, 8000, 20000, 18000, 22000, 25000, 24000, 21000, 23000, 26000],
-                borderColor: '#2563eb',
-                backgroundColor: 'rgba(37, 99, 235, 0.1)',
-                fill: true,
-                tension: 0.4
-            }]
-        }
-    });
-</script>
 @endsection
