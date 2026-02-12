@@ -21,7 +21,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/factures/{facture}', [FactureController::class, 'show'])->name('admin.factures.show');
         // MODULE IMPORTATION EXCEL
         Route::get('/imports', [ImportController::class, 'index'])->name('admin.imports.index');
-        Route::post('/imports', [ImportController::class, 'store'])->name('admin.imports.store');
+        //Route::post('/imports', [ImportController::class, 'store'])->name('admin.imports.store');
+        Route::post('/imports/upload-temp', [ImportController::class, 'uploadTemp'])->name('admin.imports.upload-temp');
+        Route::post('/imports/analyze', [ImportController::class, 'analyze'])->name('admin.imports.analyze');
+        Route::post('/imports/store', [ImportController::class, 'store'])->name('admin.imports.store');
         // GESTION DES CLIENTS
         Route::resource('clients', ClientController::class, ['as' => 'admin']);
     });

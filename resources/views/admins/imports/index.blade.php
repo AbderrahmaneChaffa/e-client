@@ -1,4 +1,4 @@
-@extends('layouts.admin')
+@extends('admins.layouts.admin')
 
 @section('content')
 <div class="max-w-4xl mx-auto" id="import-container">
@@ -24,7 +24,7 @@
             <div id="analysis-results" class="mb-6 p-4 rounded-lg">
             </div>
 
-            <form id="final-import-form" action="{{ route('admin.import.store') }}" method="POST">
+            <form id="final-import-form" action="{{ route('admin.imports.store') }}" method="POST">
                 @csrf
                 <input type="hidden" name="file_path" id="stored_file_path">
                 <button type="submit" id="btn-confirm" class="w-full bg-green-600 text-white py-4 rounded-xl font-black text-lg shadow-xl hover:bg-green-700 hidden">
@@ -55,7 +55,7 @@
         document.getElementById('progress-container').classList.remove('hidden');
 
         let xhr = new XMLHttpRequest();
-        xhr.open('POST', '{{ route("admin.import.upload-temp") }}', true);
+        xhr.open('POST', '{{ route("admin.imports.upload-temp") }}', true);
 
         xhr.upload.onprogress = (e) => {
             let percent = Math.round((e.loaded / e.total) * 100);
@@ -77,7 +77,7 @@
         document.getElementById('progress-text').innerText = "Analyse du contenu et scan des doublons...";
         document.getElementById('progress-bar').classList.replace('bg-blue-600', 'bg-orange-500');
 
-        fetch('{{ route("admin.import.analyze") }}', {
+        fetch('{{ route("admin.imports.analyze") }}', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

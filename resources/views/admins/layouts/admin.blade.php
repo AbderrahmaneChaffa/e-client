@@ -6,67 +6,185 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EPO - Administration</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
-   
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+    <style>
+        .sidebar-nav a.active {
+            background-color: rgb(59, 130, 246);
+            border-left: 4px solid rgb(147, 197, 253);
+            padding-left: calc(1.5rem - 4px);
+        }
+        
+        .sidebar-nav a:hover {
+            background-color: rgba(59, 130, 246, 0.1);
+            border-left: 4px solid rgb(59, 130, 246);
+            padding-left: calc(1.5rem - 4px);
+        }
 
+        .stat-card {
+            background: linear-gradient(135deg, var(--color-start), var(--color-end));
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
 
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin-bottom: 1rem;
+        }
+    </style>
 </head>
 
-<body class="bg-gray-100 font-sans">
+<body class="bg-gray-50 font-sans">
     <div class="flex h-screen">
-        <aside class="w-64 bg-slate-800 text-white flex-shrink-0">
-            <div class="p-6 text-center font-bold text-xl border-b border-slate-700">
-                <i class="fa-solid fa-anchor mr-2"></i> E-Client
+        <!-- Sidebar -->
+        <aside class="w-64 bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 text-white flex-shrink-0 shadow-lg">
+            <!-- Logo -->
+            <div class="p-6 text-center border-b border-slate-700">
+                <div class="flex items-center justify-center mb-2">
+                    <i class="fa-solid fa-ship text-3xl text-blue-400"></i>
+                </div>
+                <h1 class="font-bold text-xl text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-blue-300">E-Client</h1>
+                <p class="text-xs text-slate-400 mt-1">Gestion Maritime</p>
             </div>
-            <nav class="mt-6">
-                <a href="{{ route('admin.dashboard') }}" class="flex items-center py-3 px-6 bg-blue-600 text-white">
-                    <i class="fa-solid fa-chart-line mr-3"></i> Dashboard
-                </a>
-                <a href="{{route('admin.factures.index')}}" class="flex items-center py-3 px-6 text-slate-300 hover:bg-slate-700">
-                    <i class="fa-solid fa-file-invoice mr-3"></i> Factures
-                </a>
-                <a href="{{route('admin.paiements.index')}}" class="flex items-center py-3 px-6 text-slate-300 hover:bg-slate-700">
-                    <i class="fa-solid fa-credit-card mr-3"></i> Paiements
-                </a>
-                <a href="{{ route('admin.clients.index') }}" class="flex items-center py-3 px-6 text-slate-300 hover:bg-slate-700">
-                    <i class="fa-solid fa-users mr-3"></i> Clients
+
+            <!-- Navigation -->
+            <nav class="mt-8 space-y-1 px-3 sidebar-nav">
+                <a href="{{ route('admin.dashboard') }}" class="flex items-center py-3 px-4 rounded-lg {{ request()->routeIs('admin.dashboard') ? 'active' : 'text-slate-300 hover:bg-slate-700/50' }} transition">
+                    <i class="fa-solid fa-chart-line mr-3 w-5"></i>
+                    <span class="font-medium">Dashboard</span>
                 </a>
 
-                <a href="{{route('admin.imports.index')}}" class="flex items-center py-3 px-6 text-slate-300 hover:bg-slate-700">
-                    <i class="fa-solid fa-upload mr-3"></i> Import Excel
+                <a href="{{route('admin.clients.index')}}" class="flex items-center py-3 px-4 rounded-lg {{ request()->routeIs('admin.clients.*') ? 'active' : 'text-slate-300 hover:bg-slate-700/50' }} transition">
+                    <i class="fa-solid fa-users mr-3 w-5"></i>
+                    <span class="font-medium">Clients</span>
+                </a>
+
+                <a href="{{route('admin.factures.index')}}" class="flex items-center py-3 px-4 rounded-lg {{ request()->routeIs('admin.factures.*') ? 'active' : 'text-slate-300 hover:bg-slate-700/50' }} transition">
+                    <i class="fa-solid fa-file-invoice mr-3 w-5"></i>
+                    <span class="font-medium">Factures</span>
+                </a>
+
+                <a href="{{route('admin.paiements.index')}}" class="flex items-center py-3 px-4 rounded-lg {{ request()->routeIs('admin.paiements.*') ? 'active' : 'text-slate-300 hover:bg-slate-700/50' }} transition">
+                    <i class="fa-solid fa-credit-card mr-3 w-5"></i>
+                    <span class="font-medium">Paiements</span>
+                </a>
+
+                <a href="{{route('admin.imports.index')}}" class="flex items-center py-3 px-4 rounded-lg {{ request()->routeIs('admin.imports.*') ? 'active' : 'text-slate-300 hover:bg-slate-700/50' }} transition">
+                    <i class="fa-solid fa-upload mr-3 w-5"></i>
+                    <span class="font-medium">Import Excel</span>
+                </a>
+
+                <hr class="my-4 border-slate-700">
+
+                <a href="#" class="flex items-center py-3 px-4 rounded-lg text-slate-300 hover:bg-slate-700/50 transition">
+                    <i class="fa-solid fa-cog mr-3 w-5"></i>
+                    <span class="font-medium">Paramètres</span>
                 </a>
             </nav>
         </aside>
 
+        <!-- Main Content -->
         <div class="flex-1 flex flex-col overflow-hidden">
-            <header class="bg-white shadow h-16 flex items-center justify-between px-8 text-sm">
-                <span class="text-gray-600">Bienvenue, **Admin EPO**</span>
-                <form action="/logout" method="POST">
-                    @csrf
-                    <button class="text-red-500 hover:text-red-700"><i class="fa-solid fa-right-from-bracket"></i> Déconnexion</button>
-                </form>
+            <!-- Header -->
+            <header class="bg-white shadow-md border-b border-gray-200">
+                <div class="px-8 py-4 flex items-center justify-between">
+                    <div class="flex items-center gap-4">
+                        <h1 class="text-2xl font-bold text-gray-800">{{ env('APP_NAME', 'E-Client') }}</h1>
+                        <p class="text-gray-500 text-sm">Administration Générale</p>
+                    </div>
+
+                    <div class="flex items-center gap-6">
+                        <!-- Date & Time -->
+                        <div class="text-right hidden md:block">
+                            <p class="text-sm font-medium text-gray-800" id="current-date">{{ now()->format('d M Y') }}</p>
+                            <p class="text-xs text-gray-500" id="current-time">{{ now()->format('H:i') }}</p>
+                        </div>
+
+                        <!-- User Profile Dropdown -->
+                        <div class="relative group">
+                            <button class="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-gray-100 transition">
+                                <div class="w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center text-white font-bold">
+                                    {{ strtoupper(substr(auth()->user()->name, 0, 1)) }}
+                                </div>
+                                <div class="text-left hidden sm:block">
+                                    <p class="text-sm font-semibold text-gray-800">{{ auth()->user()->name }}</p>
+                                    <p class="text-xs text-gray-500">Admin</p>
+                                </div>
+                            </button>
+
+                            <!-- Dropdown Menu -->
+                            <div class="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                                <a href="{{ route('profile.edit') }}" class="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition first:rounded-t-lg">
+                                    <i class="fa-solid fa-user w-4"></i> Mon profil
+                                </a>
+                                <a href="#" class="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition">
+                                    <i class="fa-solid fa-bell w-4"></i> Notifications
+                                </a>
+                                <hr class="my-2">
+                                <form action="/logout" method="POST" class="w-full">
+                                    @csrf
+                                    <button type="submit" class="w-full text-left flex items-center gap-3 px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition rounded-b-lg">
+                                        <i class="fa-solid fa-right-from-bracket w-4"></i> Déconnexion
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </header>
 
+            <!-- Main Content Area -->
             <main class="flex-1 overflow-y-auto p-8">
+                <!-- Alerts -->
                 @if(session('success'))
-                <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
-                    {{ session('success') }}
+                <div class="mb-6 p-4 bg-green-50 border border-green-200 text-green-800 rounded-lg flex items-center gap-3 animate-pulse">
+                    <i class="fa-solid fa-check-circle"></i>
+                    <span>{{ session('success') }}</span>
+                </div>
+                @endif
+
+                @if(session('error'))
+                <div class="mb-6 p-4 bg-red-50 border border-red-200 text-red-800 rounded-lg flex items-center gap-3">
+                    <i class="fa-solid fa-exclamation-circle"></i>
+                    <span>{{ session('error') }}</span>
                 </div>
                 @endif
 
                 @if($errors->any())
-                <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-                    <ul>
+                <div class="mb-6 p-4 bg-red-50 border border-red-200 text-red-800 rounded-lg">
+                    <div class="flex items-center gap-3 mb-2">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                        <span class="font-semibold">Erreurs de validation</span>
+                    </div>
+                    <ul class="ml-6 space-y-1">
                         @foreach($errors->all() as $error)
-                        <li>{{ $error }}</li>
+                        <li class="text-sm">• {{ $error }}</li>
                         @endforeach
                     </ul>
                 </div>
                 @endif
+
                 @yield('content')
             </main>
         </div>
     </div>
+
+    <script>
+        // Update time every second
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('current-time').textContent = now.toLocaleTimeString('fr-FR', { 
+                hour: '2-digit', 
+                minute: '2-digit' 
+            });
+        }
+        setInterval(updateTime, 1000);
+    </script>
 </body>
 
 </html>
