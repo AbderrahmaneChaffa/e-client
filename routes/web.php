@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\ClientController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\ImportController;
 use App\Http\Controllers\FactureController;
@@ -21,6 +22,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // MODULE IMPORTATION EXCEL
         Route::get('/imports', [ImportController::class, 'index'])->name('admin.imports.index');
         Route::post('/imports', [ImportController::class, 'store'])->name('admin.imports.store');
+        // GESTION DES CLIENTS
+        Route::resource('clients', ClientController::class, ['as' => 'admin']);
     });
 
     Route::middleware('role:client')->group(function () {

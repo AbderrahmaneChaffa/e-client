@@ -28,7 +28,7 @@
                 <a href="{{route('admin.paiements.index')}}" class="flex items-center py-3 px-6 text-slate-300 hover:bg-slate-700">
                     <i class="fa-solid fa-credit-card mr-3"></i> Paiements
                 </a>
-                <a href="#" class="flex items-center py-3 px-6 text-slate-300 hover:bg-slate-700">
+                <a href="{{ route('admin.clients.index') }}" class="flex items-center py-3 px-6 text-slate-300 hover:bg-slate-700">
                     <i class="fa-solid fa-users mr-3"></i> Clients
                 </a>
 
