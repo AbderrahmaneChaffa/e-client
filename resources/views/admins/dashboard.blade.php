@@ -21,8 +21,8 @@
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-gray-600 text-sm font-medium">Total Facturé</p>
-                    <p class="text-3xl font-bold text-blue-600 mt-2">{{ number_format($stats->total_facture ?? 0, 0, ',', ' ') }}</p>
-                    <p class="text-xs text-gray-500 mt-2">{{ $stats->total_count ?? 0 }} factures</p>
+                    <p class="text-3xl font-bold text-blue-900 mt-2">{{ number_format($stats->total_facture ?? 0, 0, ',', ' ') }}</p>
+                    <p class="text-xs text-gray-700 mt-2">{{ $stats->total_count ?? 0 }} factures</p>
                 </div>
                 <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
                     <i class="fa-solid fa-file-invoice text-2xl text-blue-600"></i>
@@ -35,7 +35,7 @@
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-gray-600 text-sm font-medium">Total Encaissé</p>
-                    <p class="text-3xl font-bold text-green-600 mt-2">{{ number_format($stats->total_encaisse ?? 0, 0, ',', ' ') }}</p>
+                    <p class="text-3xl font-bold text-green-800 mt-2">{{ number_format($stats->total_encaisse ?? 0, 0, ',', ' ') }}</p>
                     <p class="text-xs text-gray-500 mt-2 font-semibold">✓ Paiements reçus</p>
                 </div>
                 <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
@@ -49,7 +49,7 @@
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-gray-600 text-sm font-medium">Reste à Payer</p>
-                    <p class="text-3xl font-bold text-red-600 mt-2">{{ number_format($stats->total_impayes ?? 0, 0, ',', ' ') }}</p>
+                    <p class="text-3xl font-bold text-red-800 mt-2">{{ number_format($stats->total_impayes ?? 0, 0, ',', ' ') }}</p>
                     <p class="text-xs text-gray-500 mt-2">{{ $unpaidInvoices ?? 0 }} factures impayées</p>
                 </div>
                 <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">

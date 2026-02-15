@@ -95,7 +95,7 @@
                 <div class="px-8 py-4 flex items-center justify-between">
                     <div class="flex items-center gap-4">
                         <h1 class="text-2xl font-bold text-gray-800">{{ env('APP_NAME', 'E-Client') }}</h1>
-                        <p class="text-gray-500 text-sm">Administration Générale</p>
+                        <p class="text-gray-500 text-sm">Administration</p>
                     </div>
 
                     <div class="flex items-center gap-6">
