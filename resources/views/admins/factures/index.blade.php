@@ -4,9 +4,9 @@
 <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
     <div class="flex justify-between items-center mb-6">
         <h2 class="text-xl font-bold text-gray-800">Gestion des Factures</h2>
-        <a href="#" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">
+        <!-- <a href="#" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">
             <i class="fa-solid fa-plus mr-2"></i> Nouvelle Facture
-        </a>
+        </a> -->
     </div>
 
     <form method="GET" class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
