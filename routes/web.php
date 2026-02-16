@@ -24,15 +24,24 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/imports', [ImportController::class, 'index'])->name('admin.imports.index');
         //Route::post('/imports', [ImportController::class, 'store'])->name('admin.imports.store');
         Route::post('/imports/upload-temp', [ImportController::class, 'uploadTemp'])->name('admin.imports.upload-temp');
-        Route::post('/imports/analyze', [ImportController::class, 'analyze'])->name('admin.imports.analyze');
+        //   Route::post('/imports/analyze', [ImportController::class, 'analyze'])->name('admin.imports.analyze');
         Route::post('/imports/store', [ImportController::class, 'store'])->name('admin.imports.store');
         // GESTION DES CLIENTS
         Route::resource('clients', ClientController::class, ['as' => 'admin']);
     });
 
     Route::middleware('role:client')->group(function () {
-        Route::get('/client/dashboard', fn() => view('clients.dashboard'))
+        Route::get('/client/dashboard', [\App\Http\Controllers\Client\DashboardController::class, 'index'])
             ->name('client.dashboard');
+
+        // Client invoices and payments
+        Route::get('/client/factures', [\App\Http\Controllers\Client\FactureController::class, 'index'])
+            ->name('client.factures.index');
+        Route::get('/client/factures/{facture}', [\App\Http\Controllers\Client\FactureController::class, 'show'])
+            ->name('client.factures.show');
+
+        Route::get('/client/paiements', [\App\Http\Controllers\Client\PaiementController::class, 'index'])
+            ->name('client.paiements.index');
     });
 });
 Route::get('/upload', [FileUploadController::class, 'showForm'])->name('upload.form');

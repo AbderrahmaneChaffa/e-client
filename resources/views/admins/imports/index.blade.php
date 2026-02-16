@@ -1,111 +1,131 @@
 @extends('admins.layouts.admin')
 
 @section('content')
-<div class="max-w-4xl mx-auto" id="import-container">
-    <div class="bg-white p-8 rounded-xl shadow-lg border border-gray-100">
-        <h2 class="text-2xl font-bold mb-6 text-gray-800">Module d'Importation Intelligent</h2>
-
-        <div id="drop-zone" class="border-2 border-dashed border-blue-300 rounded-xl p-10 text-center hover:bg-blue-50 transition-all cursor-pointer relative">
-            <input type="file" id="fileInput" class="hidden" accept=".xlsx,.csv">
-            <div id="upload-prompt">
-                <i class="fa-solid fa-cloud-arrow-up text-5xl text-blue-500 mb-4"></i>
-                <p class="text-gray-600 font-medium">Glissez le fichier ici ou <span class="text-blue-600 underline">parcourez</span></p>
-            </div>
-
-            <div id="progress-container" class="hidden mt-4">
-                <div class="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
-                    <div id="progress-bar" class="bg-blue-600 h-full transition-all duration-300" style="width: 0%"></div>
-                </div>
-                <p id="progress-text" class="text-sm text-blue-600 mt-2 font-bold italic text-center">Chargement du fichier : 0%</p>
-            </div>
+<div class="max-w-4xl mx-auto py-10">
+    
+    <div class="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
+        <div class="bg-gradient-to-r from-blue-900 to-blue-700 p-8 text-white">
+            <h2 class="text-3xl font-bold flex items-center">
+                <i class="fa-solid fa-database mr-4"></i> Importation Massive
+            </h2>
+            <p class="mt-2 text-blue-100 opacity-90">Module optimisé pour les fichiers > 20 000 lignes.</p>
         </div>
 
-        <div id="analysis-zone" class="hidden mt-8 border-t pt-6">
-            <div id="analysis-results" class="mb-6 p-4 rounded-lg">
-            </div>
+        <div class="p-8">
+            <div id="alert-box" class="hidden p-4 mb-6 rounded-lg text-sm font-medium"></div>
 
-            <form id="final-import-form" action="{{ route('admin.imports.store') }}" method="POST">
+            <form id="uploadForm" action="{{ route('admin.imports.store') }}" method="POST" enctype="multipart/form-data">
                 @csrf
-                <input type="hidden" name="file_path" id="stored_file_path">
-                <button type="submit" id="btn-confirm" class="w-full bg-green-600 text-white py-4 rounded-xl font-black text-lg shadow-xl hover:bg-green-700 hidden">
-                    CONFIRMER ET LANCER L'IMPORTATION
+                
+                <div class="flex items-center justify-center w-full mb-6">
+                    <label for="dropzone-file" class="flex flex-col items-center justify-center w-full h-64 border-2 border-blue-300 border-dashed rounded-lg cursor-pointer bg-blue-50 hover:bg-blue-100 transition">
+                        <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                            <i class="fa-solid fa-cloud-arrow-up text-5xl text-blue-500 mb-4"></i>
+                            <p class="mb-2 text-sm text-gray-500"><span class="font-semibold">Cliquez pour upload</span> ou glissez le fichier</p>
+                            <p class="text-xs text-gray-400">XLSX, CSV (Max 50Mo)</p>
+                            <p id="file-name" class="mt-4 text-sm font-bold text-blue-700"></p>
+                        </div>
+                        <input id="dropzone-file" type="file" name="file" class="hidden" accept=".xlsx,.csv" />
+                    </label>
+                </div>
+
+                <div id="progress-wrapper" class="hidden mb-6">
+                    <div class="flex justify-between mb-1">
+                        <span class="text-sm font-medium text-blue-700">Envoi au serveur...</span>
+                        <span class="text-sm font-medium text-blue-700" id="progress-percent">0%</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-4">
+                        <div id="progress-bar" class="bg-blue-600 h-4 rounded-full transition-all duration-75" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <button type="submit" id="btn-submit" class="w-full text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-bold rounded-lg text-lg px-5 py-4 text-center shadow-lg transition disabled:opacity-50 disabled:cursor-not-allowed">
+                    <i class="fa-solid fa-play mr-2"></i> LANCER L'IMPORTATION
                 </button>
             </form>
         </div>
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
 <script>
-    const fileInput = document.getElementById('fileInput');
-    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('dropzone-file');
+    const fileNameDisplay = document.getElementById('file-name');
+    const form = document.getElementById('uploadForm');
+    const progressWrapper = document.getElementById('progress-wrapper');
+    const progressBar = document.getElementById('progress-bar');
+    const progressPercent = document.getElementById('progress-percent');
+    const alertBox = document.getElementById('alert-box');
+    const btnSubmit = document.getElementById('btn-submit');
 
-    // 1. Déclenchement de l'upload dès la sélection
-    fileInput.addEventListener('change', e => uploadFile(e.target.files[0]));
-    dropZone.addEventListener('click', () => fileInput.click());
+    // Afficher le nom du fichier sélectionné
+    fileInput.addEventListener('change', function() {
+        if(this.files && this.files[0]) {
+            fileNameDisplay.textContent = "Fichier prêt : " + this.files[0].name;
+        }
+    });
 
-    function uploadFile(file) {
-        if (!file) return;
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
 
-        let formData = new FormData();
-        formData.append('file', file);
-        formData.append('_token', '{{ csrf_token() }}');
+        // Vérification fichier
+        if(fileInput.files.length === 0) {
+            showAlert('error', 'Veuillez sélectionner un fichier d\'abord.');
+            return;
+        }
 
-        // Afficher la progression
-        document.getElementById('upload-prompt').classList.add('hidden');
-        document.getElementById('progress-container').classList.remove('hidden');
+        // Préparation UI
+        const formData = new FormData(form);
+        progressWrapper.classList.remove('hidden');
+        btnSubmit.disabled = true;
+        btnSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Envoi en cours...';
+        hideAlert();
 
-        let xhr = new XMLHttpRequest();
-        xhr.open('POST', '{{ route("admin.imports.upload-temp") }}', true);
-
-        xhr.upload.onprogress = (e) => {
-            let percent = Math.round((e.loaded / e.total) * 100);
-            document.getElementById('progress-bar').style.width = percent + '%';
-            document.getElementById('progress-text').innerText = `Upload vers le serveur : ${percent}%`;
-        };
-
-        xhr.onload = function() {
-            if (xhr.status === 200) {
-                let res = JSON.parse(xhr.responseText);
-                analyzeFile(res.path); // Lancer l'analyse des doublons
+        // Envoi Axios
+        axios.post(form.action, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+            onUploadProgress: function(progressEvent) {
+                const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+                progressBar.style.width = percentCompleted + '%';
+                progressPercent.textContent = percentCompleted + '%';
             }
-        };
-        xhr.send(formData);
+        })
+        .then(response => {
+            // SUCCÈS
+            progressBar.classList.remove('bg-blue-600');
+            progressBar.classList.add('bg-green-500');
+            showAlert('success', response.data.message);
+            btnSubmit.innerHTML = '<i class="fa-solid fa-check mr-2"></i> Terminé !';
+            setTimeout(() => { location.reload(); }, 2000); // Recharger la page après 2s
+        })
+        .catch(error => {
+            // ERREUR
+            progressBar.classList.remove('bg-blue-600');
+            progressBar.classList.add('bg-red-600');
+            let msg = "Une erreur est survenue.";
+            if(error.response && error.response.data.message) {
+                msg = error.response.data.message;
+            }
+            showAlert('error', msg);
+            btnSubmit.disabled = false;
+            btnSubmit.innerHTML = '<i class="fa-solid fa-play mr-2"></i> Réessayer';
+        });
+    });
+
+    function showAlert(type, message) {
+        alertBox.classList.remove('hidden', 'bg-red-100', 'text-red-700', 'bg-green-100', 'text-green-700');
+        if(type === 'error') {
+            alertBox.classList.add('bg-red-100', 'text-red-700', 'border', 'border-red-400');
+            alertBox.innerHTML = `<i class="fa-solid fa-triangle-exclamation mr-2"></i> ${message}`;
+        } else {
+            alertBox.classList.add('bg-green-100', 'text-green-700', 'border', 'border-green-400');
+            alertBox.innerHTML = `<i class="fa-solid fa-circle-check mr-2"></i> ${message}`;
+        }
     }
 
-    // 2. Analyse du fichier pour détecter les doublons
-    function analyzeFile(path) {
-        document.getElementById('progress-text').innerText = "Analyse du contenu et scan des doublons...";
-        document.getElementById('progress-bar').classList.replace('bg-blue-600', 'bg-orange-500');
-
-        fetch('{{ route("admin.imports.analyze") }}', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                },
-                body: JSON.stringify({
-                    path: path
-                })
-            })
-            .then(r => r.json())
-            .then(data => {
-                document.getElementById('progress-container').classList.add('hidden');
-                document.getElementById('analysis-zone').classList.remove('hidden');
-                document.getElementById('stored_file_path').value = path;
-
-                let resDiv = document.getElementById('analysis-results');
-                if (data.duplicates > 0) {
-                    resDiv.className = "p-4 bg-red-50 border-l-4 border-red-500 text-red-700";
-                    resDiv.innerHTML = `<h3 class="font-bold text-lg"><i class="fa-solid fa-triangle-exclamation"></i> ATTENTION !</h3>
-                                <p>Ce fichier contient <b>${data.duplicates}</b> factures qui existent déjà en base de données.</p>
-                                <p class="text-sm mt-2 font-bold italic">Si vous confirmez, ces factures seront mises à jour avec les nouvelles données de l'Excel.</p>`;
-                } else {
-                    resDiv.className = "p-4 bg-green-50 border-l-4 border-green-500 text-green-700";
-                    resDiv.innerHTML = `<h3 class="font-bold text-lg"><i class="fa-solid fa-check-circle"></i> FICHIER SAIN</h3>
-                                <p>Aucun doublon détecté sur les ${data.total} lignes. Vous pouvez procéder.</p>`;
-                }
-                document.getElementById('btn-confirm').classList.remove('hidden');
-            });
+    function hideAlert() {
+        alertBox.classList.add('hidden');
     }
 </script>
 @endsection
