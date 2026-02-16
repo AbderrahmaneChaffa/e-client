@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\ClientController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\ImportController;
 use App\Http\Controllers\FactureController;
+use App\Http\Controllers\FileUploadController;
 use App\Http\Controllers\PaiementController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
@@ -34,7 +35,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('client.dashboard');
     });
 });
-
+Route::get('/upload', [FileUploadController::class, 'showForm'])->name('upload.form');
+Route::post('/upload', [FileUploadController::class, 'upload'])->name('file.upload');
 
 
 Route::get('/dashboard', function () {
