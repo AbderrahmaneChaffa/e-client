@@ -22,10 +22,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/factures/{facture}', [FactureController::class, 'show'])->name('admin.factures.show');
         // MODULE IMPORTATION EXCEL
         Route::get('/imports', [ImportController::class, 'index'])->name('admin.imports.index');
-        //Route::post('/imports', [ImportController::class, 'store'])->name('admin.imports.store');
+        // import factures and paiements separately
+        Route::get('/imports/template/factures', [ImportController::class, 'templateFactures'])->name('admin.imports.template.factures');
+        Route::post('/imports/factures', [ImportController::class, 'storeFactures'])->name('admin.imports.factures');
+        Route::get('/imports/template/paiements', [ImportController::class, 'templatePaiements'])->name('admin.imports.template.paiements');
+        Route::post('/imports/paiements', [ImportController::class, 'storePaiements'])->name('admin.imports.paiements');
+        // legacy/temp endpoints left for compatibility
         Route::post('/imports/upload-temp', [ImportController::class, 'uploadTemp'])->name('admin.imports.upload-temp');
-        //   Route::post('/imports/analyze', [ImportController::class, 'analyze'])->name('admin.imports.analyze');
-        Route::post('/imports/store', [ImportController::class, 'store'])->name('admin.imports.store');
+        Route::post('/imports/store', [ImportController::class, 'storeFactures']); // alias to factures
+
         // GESTION DES CLIENTS
         Route::resource('clients', ClientController::class, ['as' => 'admin']);
     });
