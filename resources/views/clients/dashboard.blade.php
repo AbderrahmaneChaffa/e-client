@@ -81,7 +81,7 @@
                         <p class="text-xs text-gray-500">{{ $pay->date_paiement }}</p>
                     </div>
                     <div class="text-right text-green-600 font-bold">
-                        + {{ number_format($pay->montant_verse, 0, ',', ' ') }} DA
+                        + {{ number_format($pay->montant, 0, ',', ' ') }} DA
                     </div>
                 </div>
                 @empty

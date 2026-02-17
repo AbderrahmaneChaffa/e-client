@@ -92,7 +92,7 @@
                     <td class="p-4">{{ $pay->date_paiement }}</td>
                     <td class="p-4">{{ $pay->reference_recu }}</td>
                     <td class="p-4">{{ $pay->banque }}</td>
-                    <td class="p-4 text-right font-bold text-green-600">+ {{ number_format($pay->montant_verse, 2) }}</td>
+                    <td class="p-4 text-right font-bold text-green-600">+ {{ number_format($pay->montant, 2) }}</td>
                 </tr>
                 @endforeach
             </tbody>

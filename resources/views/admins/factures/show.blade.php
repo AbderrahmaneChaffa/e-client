@@ -99,7 +99,7 @@
                         <span class="text-xs text-gray-500">Chq: {{ $pay->numero_cheque }}</span>
                     </td>
                     <td class="p-4">{{ $pay->banque }}</td>
-                    <td class="p-4 text-right font-bold text-green-600">+ {{ number_format($pay->montant_verse, 2) }}</td>
+                    <td class="p-4 text-right font-bold text-green-600">+ {{ number_format($pay->montant, 2) }}</td>
                 </tr>
                 @endforeach
             </tbody>

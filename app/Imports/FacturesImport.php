@@ -33,7 +33,7 @@ class FacturesImport implements ToModel, WithHeadingRow, WithChunkReading, WithB
 
         // 2. Gestion Robuste du Client
         $client = Client::firstOrCreate(
-            ['code' => trim($row['client_code'])],
+            ['code_client' => trim($row['client_code'])],
             [
                 'name' => $row['client_nom'] ?? 'Client Inconnu',
                 'nis'  => $row['nis'] ?? null

@@ -15,11 +15,11 @@ class ClientController extends Controller
     {
         $query = Client::query();
 
-        // Search by code or name
+        // Search by code_client or name
         if ($request->filled('search')) {
             $search = $request->input('search');
             $query->where(function ($q) use ($search) {
-                $q->where('code', 'like', "%{$search}%")
+                $q->where('code_client', 'like', "%{$search}%")
                     ->orWhere('name', 'like', "%{$search}%")
                     ->orWhere('nis', 'like', "%{$search}%");
             });
@@ -49,7 +49,7 @@ class ClientController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'code' => 'required|string|unique:clients|max:50',
+            'code_client' => 'required|string|unique:clients|max:50',
             'name' => 'required|string|max:255',
             'nis' => 'nullable|string|max:50',
             'rc' => 'nullable|string|max:50',
@@ -85,7 +85,7 @@ class ClientController extends Controller
     public function update(Request $request, Client $client)
     {
         $validated = $request->validate([
-            'code' => 'required|string|max:50|unique:clients,code,' . $client->id,
+            'code_client' => 'required|string|max:50|unique:clients,code_client,' . $client->id,
             'name' => 'required|string|max:255',
             'nis' => 'nullable|string|max:50',
             'rc' => 'nullable|string|max:50',

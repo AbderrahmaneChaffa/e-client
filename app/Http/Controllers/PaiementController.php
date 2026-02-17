@@ -17,7 +17,7 @@ class PaiementController extends Controller
 
         // Filtre par référence de reçu ou chèque
         if ($request->filled('search')) {
-            $query->where('reference_recu', 'like', '%' . $request->search . '%')
+            $query->where('recu', 'like', '%' . $request->search . '%')
                 ->orWhere('numero_cheque', 'like', '%' . $request->search . '%');
         }
 

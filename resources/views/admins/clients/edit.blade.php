@@ -11,12 +11,12 @@
         <div class="space-y-6">
             <!-- Code Client (Read Only) -->
             <div>
-                <label for="code" class="block text-sm font-medium text-gray-700 mb-1">Code Client</label>
+                <label for="code_client" class="block text-sm font-medium text-gray-700 mb-1">Code Client</label>
                 <input 
                     type="text" 
-                    name="code" 
-                    id="code" 
-                    value="{{ $client->code }}" 
+                    name="code_client" 
+                    id="code_client" 
+                    value="{{ $client->code_client }}" 
                     readonly
                     class="w-full border border-gray-300 rounded-lg px-4 py-2 bg-gray-50 text-gray-600">
             </div>

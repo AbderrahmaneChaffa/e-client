@@ -50,14 +50,14 @@
                         <span class="text-blue-600 font-mono">{{ $paiement->facture->numero_facture }}</span>
                     </td>
                     <td class="p-4">
-                        <div class="text-xs text-gray-500 italic">Recu: {{ $paiement->reference_recu }}</div>
+                        <div class="text-xs text-gray-500 italic">Recu: {{ $paiement->recu }}</div>
                         <div class="text-xs font-bold">Chq: {{ $paiement->numero_cheque }}</div>
                     </td>
                     <td class="p-4">
                         <span class="px-2 py-1 bg-slate-100 rounded text-xs">{{ $paiement->banque }}</span>
                     </td>
                     <td class="p-4 text-right font-bold text-green-600">
-                        {{ number_format($paiement->montant_verse, 2) }} DA
+                        {{ number_format($paiement->montant, 2) }} DA
                     </td>
                 </tr>
                 @empty

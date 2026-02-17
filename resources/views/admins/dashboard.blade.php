@@ -281,7 +281,7 @@
                         <p class="text-xs text-gray-600">{{ $payment->facture->client->name ?? 'Client' }}</p>
                     </div>
                     <div class="text-right">
-                        <p class="font-bold text-green-600">+ {{ number_format($payment->montant_verse, 0, ',', ' ') }} DA</p>
+                        <p class="font-bold text-green-600">+ {{ number_format($payment->montant, 0, ',', ' ') }} DA</p>
                         <p class="text-xs text-gray-500">{{ $payment->date_paiement }}</p>
                     </div>
                 </div>

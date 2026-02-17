@@ -20,7 +20,7 @@
                 <label class="block text-sm font-medium text-gray-700 mb-1">Trier par</label>
                 <select name="sort" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                     <option value="name" {{ request('sort') == 'name' ? 'selected' : '' }}>Nom</option>
-                    <option value="code" {{ request('sort') == 'code' ? 'selected' : '' }}>Code</option>
+                    <option value="code_client" {{ request('sort') == 'code_client' ? 'selected' : '' }}>Code</option>
                     <option value="created_at" {{ request('sort') == 'created_at' ? 'selected' : '' }}>Date de création</option>
                 </select>
             </div>
@@ -55,7 +55,7 @@
             <tbody class="text-sm">
                 @forelse($clients as $client)
                 <tr class="hover:bg-gray-50 transition border-b">
-                    <td class="p-4 font-semibold text-blue-600">{{ $client->code }}</td>
+                    <td class="p-4 font-semibold text-blue-600">{{ $client->code_client }}</td>
                     <td class="p-4 font-medium">{{ $client->name }}</td>
                     <td class="p-4 text-gray-600">{{ $client->nis ?? '-' }}</td>
                     <td class="p-4 text-gray-600">{{ $client->rc ?? '-' }}</td>

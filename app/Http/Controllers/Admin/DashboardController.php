@@ -46,7 +46,7 @@ class DashboardController extends Controller
             ->get();
 
         // Données pour le graphique mensuel (6 derniers mois)
-        $monthlyData = Paiement::selectRaw('MONTH(date_paiement) as mois, SUM(montant_verse) as total')
+        $monthlyData = Paiement::selectRaw('MONTH(date_paiement) as mois, SUM(montant) as total')
             ->where('date_paiement', '>=', now()->subMonths(6))
             ->groupBy('mois')
             ->orderBy('mois')

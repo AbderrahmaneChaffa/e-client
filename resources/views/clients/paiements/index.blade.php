@@ -36,7 +36,7 @@
                     <td class="p-4">{{ $p->facture->numero_facture ?? '-' }}</td>
                     <td class="p-4">{{ $p->reference_recu }}</td>
                     <td class="p-4">{{ $p->banque }}</td>
-                    <td class="p-4 text-right font-bold text-green-600">+ {{ number_format($p->montant_verse, 2) }} DA</td>
+                    <td class="p-4 text-right font-bold text-green-600">+ {{ number_format($p->montant, 2) }} DA</td>
                 </tr>
                 @endforeach
             </tbody>
