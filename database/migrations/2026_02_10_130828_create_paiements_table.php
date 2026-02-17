@@ -6,26 +6,38 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('paiements', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('facture_id')->constrained()->onDelete('cascade');
+
+            // Lien facture
+            $table->foreignId('facture_id')->constrained()->cascadeOnDelete();
+
+            // Détails du paiement
             $table->date('date_paiement');
-            $table->string('reference_recu')->nullable();
+            $table->decimal('montant', 15, 2); // Le montant payé cette fois-ci
+
+            // Mode de ce paiement spécifique (ex: l'acompte en virement, le solde en chèque)
+            $table->tinyInteger('mode_paiement')->default(1)->comment('1: Virement, 2: Chèque, 3: Espèce, 4: Versement');
+
+            // Infos Chèque / Virement
             $table->string('numero_cheque')->nullable();
             $table->string('banque')->nullable();
-            $table->decimal('montant_verse', 15, 2);
+            $table->string('image_recu')->nullable()->comment('Chemin vers scan du chèque ou ordre de virement');
+
+            // Infos complémentaires
+            $table->string('facture_anterieur')->nullable()->comment('Ancienne référence ou facture antérieur');
+            $table->text('note')->nullable()->comment('Commentaire libre sur ce paiement');
+
+            // Traçabilité
+            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
+
             $table->timestamps();
+            $table->softDeletes();
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('paiements');
