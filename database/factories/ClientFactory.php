@@ -17,11 +17,15 @@ class ClientFactory extends Factory
     public function definition(): array
     {
         return [
-            'code' => 'C-' . $this->faker->unique()->numberBetween(1000, 9999),
+            'code_client' => 'C' . $this->faker->unique()->numberBetween(1000, 9999),
             'name' => $this->faker->company(),
+            'adresse' => $this->faker->address(),
             'nis'  => $this->faker->numerify('###############'), // 15 chiffres
             'rc'   => $this->faker->numerify('##########'),
             'ai'   => $this->faker->numerify('###########'),
+            'nif'  => $this->faker->numerify('###############'),
+            'email' => $this->faker->unique()->companyEmail(),
+            'telephone' => $this->faker->phoneNumber(),
             'created_at' => now(),
             'updated_at' => now(),
         ];

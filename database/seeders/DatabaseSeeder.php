@@ -1,79 +1,82 @@
 <?php
 
+
+
 namespace Database\Seeders;
 
+use App\Models\User;
 use App\Models\Client;
-use App\Models\Facture;
 use App\Models\Navire;
+use App\Models\Facture;
 use App\Models\Paiement;
 use App\Models\Prestation;
-use App\Models\User;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 
 class DatabaseSeeder extends Seeder
 {
     use WithoutModelEvents;
 
-    /**
-     * Seed the application's database.
-     */
     public function run(): void
     {
-        //User::factory(10)->create();
+        // 1. Créer l'admin
+        $admin = User::factory()->create([
+            'name' => 'Admin',
+            'email' => 'admin@e-client.com',
+            'password' => bcrypt('password'),
+            'role' => 'admin',
+        ]);
 
-        // User::factory()->create([
-        //     'name' => 'Test User',
-        //     'email' => 'test@example.com',
-        // ]);
-        
-        // 2. Créer 1000 clients de manière performante
-        // On utilise count(1000) pour générer la masse
-        Client::factory()->count(1000)->create();
-
-        $this->command->info('1000 clients ont été créés avec succès pour le Port d\'Oran !');
-       //--------------------------------------------------------------------------------------------
-       
-       // 1. Créer 500 Navires
-        $navires = Navire::factory()->count(500)->create();
-
-        // 2. Récupérer les IDs des 1000 clients créés précédemment
+        // 2. Créer 1000 clients
+        $this->command->info('Création des clients...');
+        Client::factory()->count(1000)->create([
+            'created_by' => $admin->id
+        ]);
         $clientIds = Client::pluck('id');
 
-        $this->command->info('Génération de 20 000 factures...');
+        // 3. Créer 500 Navires
+        $this->command->info('Création des navires...');
+        $navires = Navire::factory()->count(500)->create();
 
-        // Utilisation de blocs pour ne pas saturer la mémoire
-        for ($i = 0; $i < 20; $i++) {
+        $this->command->info('Génération de 20 000 factures (Processus lourd)...');
+
+        // On utilise des blocs de 500 pour ne pas surcharger la RAM
+        for ($i = 0; $i < 40; $i++) {
             Facture::factory()
-                ->count(1000)
+                ->count(500)
                 ->create([
                     'client_id' => fn() => $clientIds->random(),
                     'navire_id' => fn() => $navires->random()->id,
+                    'created_by' => $admin->id,
                 ])
-                ->each(function ($facture) {
-                    // Ajouter 3 prestations par facture
+                ->each(function ($facture) use ($admin) {
+                    // 4. Ajouter 3 prestations
+                    // On s'assure que le total_ht de la facture est cohérent avec les prestations
                     Prestation::factory()->count(3)->create([
                         'facture_id' => $facture->id,
                         'total_ht' => $facture->total_ht / 3
                     ]);
 
-                    // Simuler un paiement aléatoire pour certaines factures
+                    // 5. Simuler un paiement aléatoire (50% de chance)
                     if (rand(0, 1)) {
-                        $versement = $facture->total_ttc * (rand(50, 100) / 100);
+                        $montantAPayer = $facture->total_ttc * (rand(50, 100) / 100);
+
                         Paiement::factory()->create([
                             'facture_id' => $facture->id,
-                            'montant_verse' => $versement,
+                            'montant' => $montantAPayer, // Correction du nom de colonne
                             'date_paiement' => now(),
+                            'created_by' => $admin->id,
                         ]);
 
-                        // Mise à jour des soldes de la facture
+                        // Mise à jour de l'état de la facture
                         $facture->update([
-                            'montant_paye' => $versement,
-                            'reste_a_payer' => $facture->total_ttc - $versement
+                            'montant_paye' => $montantAPayer,
+                            'reste_a_payer' => $facture->total_ttc - $montantAPayer
                         ]);
                     }
                 });
-            $this->command->info("Bloc " . ($i + 1) . " terminé...");
+
+            $this->command->info("Progrès : " . (($i + 1) * 500) . " / 20 000 factures générées.");
         }
     }
 }

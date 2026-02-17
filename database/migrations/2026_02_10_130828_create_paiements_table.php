@@ -15,6 +15,7 @@ return new class extends Migration
             $table->foreignId('facture_id')->constrained()->cascadeOnDelete();
 
             // Détails du paiement
+            $table->string('recu')->nullable();
             $table->date('date_paiement');
             $table->decimal('montant', 15, 2); // Le montant payé cette fois-ci
 

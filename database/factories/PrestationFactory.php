@@ -20,11 +20,14 @@ class PrestationFactory extends Factory
         $pu = $this->faker->randomFloat(2, 100, 5000);
 
         return [
-            'code_produit' => 'PRD-' . $this->faker->unique(true)->numberBetween(100, 999),
-            'designation' => $this->faker->sentence(3), // Simule "Gardiennage Navire", "Remorquage", etc.
+            'article' => 'PRD' . $this->faker->unique(true)->numberBetween(100, 999),
+            'libelle' => $this->faker->sentence(3), // Simule "Gardiennage Navire", "Remorquage", etc.
             'quantite' => $quantite,
             'prix_unitaire' => $pu,
+            'taux_ht' => 0, // Par défaut, on peut le calculer plus tard
+            'total_tva' => 0, // Par défaut, on peut le calculer plus tard
             'total_ht' => $quantite * $pu, // On garde la logique mathématique
+            'total_ttc' => $quantite * $pu, // Par défaut, on peut le calculer plus tard
         ];
     }
 }
