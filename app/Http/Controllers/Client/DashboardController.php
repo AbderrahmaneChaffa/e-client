@@ -43,7 +43,7 @@ class DashboardController extends Controller
         $invoiceChartData = ['paid' => $paidInvoices, 'unpaid' => $unpaidInvoices];
 
         // Paiements mensuels (6 derniers mois)
-        $monthlyData = Paiement::selectRaw('MONTH(date_paiement) as mois, SUM(montant_verse) as total')
+        $monthlyData = Paiement::selectRaw('MONTH(date_paiement) as mois, SUM(montant) as total')
             ->whereHas('facture', fn($q) => $q->where('client_id', $clientId))
             ->where('date_paiement', '>=', now()->subMonths(6))
             ->groupBy('mois')

@@ -53,9 +53,9 @@ Route::get('/upload', [FileUploadController::class, 'showForm'])->name('upload.f
 Route::post('/upload', [FileUploadController::class, 'upload'])->name('file.upload');
 
 
-Route::get('/dashboard', function () {
-    return view('dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard');
+// Route::get('/dashboard', function () {
+//     return view('dashboard');
+// })->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
