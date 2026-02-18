@@ -4,94 +4,387 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ config('app.name', 'E-Client') }}</title>
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <title>@yield('page-title') - E-Client</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
     <style>
-        .chart-container {
-            position: relative;
-            height: 300px;
-            margin-bottom: 1rem;
+        :root {
+            --primary: #0ea5e9;
+            --primary-dark: #0284c7;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --dark: #1f2937;
+            --light: #f3f4f6;
+        }
+
+        body {
+            background-color: var(--light);
+            color: var(--dark);
+        }
+
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            height: 100vh;
+            width: 250px;
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+        }
+
+        .sidebar-link {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 20px;
+            color: #cbd5e1;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            border-left: 3px solid transparent;
+        }
+
+        .sidebar-link:hover,
+        .sidebar-link.active {
+            color: var(--primary);
+            background-color: rgba(14, 165, 233, 0.1);
+            border-left-color: var(--primary);
+        }
+
+        .sidebar-link i {
+            width: 20px;
+            text-align: center;
+        }
+
+        .content-wrapper {
+            margin-left: 250px;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        .topbar {
+            background: white;
+            border-bottom: 1px solid #e5e7eb;
+            padding: 16px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .topbar-title {
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--dark);
+        }
+
+        .main-content {
+            flex: 1;
+            padding: 24px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 24px;
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+
+        .kpi-card {
+            background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
+        }
+
+        .badge-paid {
+            background-color: #d1fae5;
+            color: var(--success);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .badge-pending {
+            background-color: #fef3c7;
+            color: var(--warning);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .badge-unpaid {
+            background-color: #fee2e2;
+            color: var(--danger);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            padding: 10px 16px;
+            border-radius: 6px;
+            text-decoration: none;
+            display: inline-block;
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
+        }
+
+        .btn-secondary {
+            background: white;
+            color: var(--primary);
+            padding: 10px 16px;
+            border-radius: 6px;
+            text-decoration: none;
+            display: inline-block;
+            transition: all 0.3s ease;
+            border: 1px solid var(--primary);
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        .btn-secondary:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: var(--dark);
+        }
+
+        .form-input,
+        .form-select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .form-input:focus,
+        .form-select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
+        }
+
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .table thead {
+            background-color: #f9fafb;
+            border-bottom: 2px solid #e5e7eb;
+        }
+
+        .table th {
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            color: var(--dark);
+        }
+
+        .table td {
+            padding: 12px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .table tbody tr:hover {
+            background-color: #f9fafb;
+        }
+
+        .alert {
+            padding: 16px;
+            border-radius: 6px;
+            margin-bottom: 16px;
+        }
+
+        .alert-success {
+            background-color: #d1fae5;
+            color: var(--success);
+            border: 1px solid #a7f3d0;
+        }
+
+        .alert-danger {
+            background-color: #fee2e2;
+            color: var(--danger);
+            border: 1px solid #fecaca;
+        }
+
+        .alert-warning {
+            background-color: #fef3c7;
+            color: var(--warning);
+            border: 1px solid #fcd34d;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+
+        .modal.active {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 24px;
+            border-radius: 8px;
+            max-width: 600px;
+            width: 90%;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 0;
+                overflow-x: hidden;
+            }
+
+            .content-wrapper {
+                margin-left: 0;
+            }
+
+            .sidebar.active {
+                width: 250px;
+            }
         }
     </style>
+    @yield('extra-css')
 </head>
 
-<body class="bg-gray-50 font-sans">
-    <div class="flex h-screen">
-        <!-- Sidebar -->
-        <aside class="w-64 bg-white border-r border-gray-200 flex-shrink-0">
-            <div class="p-6 text-center border-b">
-                <h1 class="font-bold text-xl text-gray-800">E-Client</h1>
-                <p class="text-xs text-gray-500">Portail Client</p>
-            </div>
-            <nav class="mt-6 space-y-1 px-4">
-                <a href="{{ route('client.dashboard') }}" class="flex items-center py-2 px-3 rounded-lg {{ request()->routeIs('client.dashboard') ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100' }} transition">
-                    <i class="fa-solid fa-chart-line mr-3 w-5"></i>
-                    <span class="font-medium">Tableau de bord</span>
-                </a>
-                <a href="{{ route('client.factures.index') }}" class="flex items-center py-2 px-3 rounded-lg {{ request()->routeIs('client.factures.*') ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100' }} transition">
-                    <i class="fa-solid fa-file-invoice mr-3 w-5"></i>
-                    <span class="font-medium">Factures</span>
-                </a>
-                <a href="{{ route('client.paiements.index') }}" class="flex items-center py-2 px-3 rounded-lg {{ request()->routeIs('client.paiements.*') ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100' }} transition">
-                    <i class="fa-solid fa-credit-card mr-3 w-5"></i>
-                    <span class="font-medium">Paiements</span>
-                </a>
-                <a href="{{ route('profile.edit') }}" class="flex items-center py-2 px-3 rounded-lg {{ request()->routeIs('profile.*') ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100' }} transition">
-                    <i class="fa-solid fa-user mr-3 w-5"></i>
-                    <span class="font-medium">Mon profil</span>
-                </a>
-            </nav>
-        </aside>
+<body>
+    <div class="sidebar" id="sidebar">
+        <div style="padding: 24px; border-bottom: 1px solid #334155;">
+            <h1 style="color: var(--primary); font-size: 24px; font-weight: bold; margin: 0;">E-Client</h1>
+            <p style="color: #94a3b8; font-size: 12px; margin: 4px 0 0 0;">Portail Client</p>
+        </div>
 
-        <!-- Content -->
-        <div class="flex-1 flex flex-col overflow-hidden">
-            <!-- Header -->
-            <header class="bg-white shadow-md border-b border-gray-200">
-                <div class="px-8 py-4 flex items-center justify-between">
-                    <h2 class="text-xl font-semibold text-gray-800">@yield('page-title', 'Dashboard')</h2>
-                    <form action="/logout" method="POST">
-                        @csrf
-                        <button class="text-red-600 hover:text-red-800 flex items-center gap-1">
-                            <i class="fa-solid fa-right-from-bracket"></i> Déconnexion
-                        </button>
-                    </form>
-                </div>
-            </header>
+        <nav style="padding-top: 16px;">
+            <a href="{{ route('client.dashboard') }}" class="sidebar-link {{ request()->routeIs('client.dashboard') ? 'active' : '' }}">
+                <i class="fas fa-chart-line"></i>
+                <span>Tableau de bord</span>
+            </a>
+            <a href="{{ route('client.factures.index') }}" class="sidebar-link {{ request()->routeIs('client.factures*') ? 'active' : '' }}">
+                <i class="fas fa-file-invoice"></i>
+                <span>Factures</span>
+            </a>
+            <a href="{{ route('client.paiements.index') }}" class="sidebar-link {{ request()->routeIs('client.paiements*') ? 'active' : '' }}">
+                <i class="fas fa-credit-card"></i>
+                <span>Paiements</span>
+            </a>
+            <a href="#" class="sidebar-link {{ request()->routeIs('client.documents*') ? 'active' : '' }}">
+                <i class="fas fa-folder"></i>
+                <span>Documents</span>
+            </a>
+            <a href="#" class="sidebar-link {{ request()->routeIs('client.profil') ? 'active' : '' }}">
+                <i class="fas fa-user"></i>
+                <span>Mon Profil</span>
+            </a>
+            <a href="#" class="sidebar-link {{ request()->routeIs('client.parametres') ? 'active' : '' }}">
+                <i class="fas fa-cog"></i>
+                <span>Paramètres</span>
+            </a>
+        </nav>
 
-            <!-- Main area -->
-            <main class="flex-1 overflow-y-auto p-8">
-                @if(session('success'))
-                <div class="mb-6 p-4 bg-green-50 border border-green-200 text-green-800 rounded-lg flex items-center gap-3">
-                    <i class="fa-solid fa-check-circle"></i>
-                    <span>{{ session('success') }}</span>
-                </div>
-                @endif
-                @if(session('error'))
-                <div class="mb-6 p-4 bg-red-50 border border-red-200 text-red-800 rounded-lg flex items-center gap-3">
-                    <i class="fa-solid fa-exclamation-circle"></i>
-                    <span>{{ session('error') }}</span>
-                </div>
-                @endif
-                @if($errors->any())
-                <div class="mb-6 p-4 bg-red-50 border border-red-200 text-red-800 rounded-lg">
-                    <div class="flex items-center gap-3 mb-2">
-                        <i class="fa-solid fa-triangle-exclamation"></i>
-                        <span class="font-semibold">Erreurs</span>
-                    </div>
-                    <ul class="ml-6 space-y-1">
-                        @foreach($errors->all() as $error)
-                        <li class="text-sm">• {{ $error }}</li>
-                        @endforeach
-                    </ul>
-                </div>
-                @endif
-
-                @yield('content')
-            </main>
+        <div style="position: absolute; bottom: 0; width: 100%; border-top: 1px solid #334155; padding: 16px 20px;">
+            <a href="{{ route('logout') }}" class="sidebar-link" onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
+                <i class="fas fa-sign-out-alt"></i>
+                <span>Déconnexion</span>
+            </a>
+            <form id="logout-form" action="{{ route('logout') }}" method="POST" style="display: none;">
+                @csrf
+            </form>
         </div>
     </div>
+
+    <div class="content-wrapper">
+        <div class="topbar">
+            <div class="topbar-title">@yield('page-title')</div>
+            <div style="display: flex; align-items: center; gap: 16px;">
+                <div style="text-align: right;">
+                    <p style="margin: 0; font-weight: 600;">{{ Auth::user()->name ?? 'Client' }}</p>
+                    <p style="margin: 4px 0 0 0; font-size: 12px; color: #6b7280;">{{ Auth::user()->email ?? '' }}</p>
+                </div>
+                <img src="https://ui-avatars.com/api/?name={{ urlencode(Auth::user()->name ?? 'Client') }}&background=0ea5e9&color=fff" alt="Avatar" style="width: 40px; height: 40px; border-radius: 50%;">
+            </div>
+        </div>
+
+        <div class="main-content">
+            @if ($errors->any())
+            <div class="alert alert-danger">
+                <strong>Erreurs:</strong>
+                <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+                    @foreach ($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            </div>
+            @endif
+
+            @if (session('success'))
+            <div class="alert alert-success">
+                <i class="fas fa-check-circle"></i>
+                {{ session('success') }}
+            </div>
+            @endif
+
+            @if (session('error'))
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-circle"></i>
+                {{ session('error') }}
+            </div>
+            @endif
+
+            @yield('content')
+        </div>
+    </div>
+
+    <script>
+        // Mobile sidebar toggle
+        document.addEventListener('DOMContentLoaded', function() {
+            const sidebar = document.getElementById('sidebar');
+            window.toggleSidebar = function() {
+                sidebar.classList.toggle('active');
+            };
+        });
+    </script>
+    @yield('extra-js')
 </body>
 
 </html>

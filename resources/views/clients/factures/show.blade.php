@@ -50,7 +50,7 @@
             <tbody class="text-sm">
                 @foreach($facture->prestations as $item)
                 <tr class="border-b last:border-0">
-                    <td class="p-4 font-medium">{{ $item->designation }}</td>
+                    <td class="p-4 font-medium">{{ $item->libelle }}</td>
                     <td class="p-4 text-center">{{ $item->quantite }}</td>
                     <td class="p-4 text-right">{{ number_format($item->prix_unitaire, 2) }}</td>
                     <td class="p-4 text-right font-bold">{{ number_format($item->total_ht, 2) }}</td>
@@ -90,7 +90,7 @@
                 @foreach($facture->paiements as $pay)
                 <tr class="border-b last:border-0">
                     <td class="p-4">{{ $pay->date_paiement }}</td>
-                    <td class="p-4">{{ $pay->reference_recu }}</td>
+                    <td class="p-4">{{ $pay->recu }}</td>
                     <td class="p-4">{{ $pay->banque }}</td>
                     <td class="p-4 text-right font-bold text-green-600">+ {{ number_format($pay->montant, 2) }}</td>
                 </tr>

@@ -3,10 +3,11 @@
 namespace App\Http\Controllers\Client;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\Auth;
 use App\Models\Facture;
 use App\Models\Paiement;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
 
 class DashboardController extends Controller
 {
@@ -15,54 +16,66 @@ class DashboardController extends Controller
         $user = Auth::user();
         $clientId = $user->client_id;
 
-        // Totaux factures
-        $totalInvoices = Facture::where('client_id', $clientId)->count();
-        $totalFactured = Facture::where('client_id', $clientId)->sum('total_ttc');
-        $totalPaid = Facture::where('client_id', $clientId)->sum('montant_paye');
-        $totalDue = Facture::where('client_id', $clientId)->sum('reste_a_payer');
+        // 1. Calcul des totaux en UNE SEULE requête (Optimisation Performance)
+        // On exclut strictement les factures annulées
+        $stats = Facture::where('client_id', $clientId)
+            ->where('annuler', false)
+            ->selectRaw('
+                COUNT(*) as count, 
+                SUM(total_ttc) as total_factured, 
+                SUM(montant_paye) as total_paid, 
+                SUM(reste_a_payer) as total_due
+            ')
+            ->first();
 
-        // Récents
-        $recentInvoices = Facture::where('client_id', $clientId)
+        // 2. Factures récentes avec relations (Navire par exemple)
+        $recentInvoices = Facture::with('navire') // Eager loading
+            ->where('client_id', $clientId)
+            ->where('annuler', false)
             ->orderBy('date_facture', 'desc')
             ->take(5)
             ->get();
 
+        // 3. Paiements récents
         $recentPayments = Paiement::whereHas('facture', function ($q) use ($clientId) {
-            $q->where('client_id', $clientId);
-        })->orderBy('date_paiement', 'desc')
+            $q->where('client_id', $clientId)->where('annuler', false);
+        })
+            ->orderBy('date_paiement', 'desc')
             ->take(5)
             ->get();
 
-        // Statut factures pour graphique
-        $paidInvoices = Facture::where('client_id', $clientId)
-            ->where('reste_a_payer', '<=', 0)->count();
-        $unpaidInvoices = Facture::where('client_id', $clientId)
-            ->where('reste_a_payer', '>', 0)->count();
-        $totalInv = $paidInvoices + $unpaidInvoices;
+        // 4. Données pour le graphique de statut (Donut Chart)
+        $paidCount = Facture::where('client_id', $clientId)
+            ->where('annuler', false)
+            ->where('reste_a_payer', '<=', 0)
+            ->count();
 
-        $invoiceChartData = ['paid' => $paidInvoices, 'unpaid' => $unpaidInvoices];
+        $unpaidCount = ($stats->count ?? 0) - $paidCount;
 
-        // Paiements mensuels (6 derniers mois)
-        $monthlyData = Paiement::selectRaw('MONTH(date_paiement) as mois, SUM(montant) as total')
-            ->whereHas('facture', fn($q) => $q->where('client_id', $clientId))
-            ->where('date_paiement', '>=', now()->subMonths(6))
-            ->groupBy('mois')
-            ->orderBy('mois')
+        // 5. Paiements mensuels (6 derniers mois) - Correction du tri par année/mois
+        $monthlyData = Paiement::selectRaw('YEAR(date_paiement) as annee, MONTH(date_paiement) as mois, SUM(montant) as total')
+            ->whereHas('facture', fn($q) => $q->where('client_id', $clientId)->where('annuler', false))
+            ->where('date_paiement', '>=', now()->subMonths(6)->startOfMonth())
+            ->groupBy('annee', 'mois')
+            ->orderBy('annee', 'asc')
+            ->orderBy('mois', 'asc')
             ->get();
 
-        $labels = $monthlyData->map(fn($d) => date('M', mktime(0, 0, 0, $d->mois, 1)));
+        $labels = $monthlyData->map(function ($d) {
+            return Carbon::create($d->annee, $d->mois, 1)->translatedFormat('M Y');
+        });
         $amounts = $monthlyData->pluck('total');
 
-        return view('clients.dashboard', compact(
-            'totalInvoices',
-            'totalFactured',
-            'totalPaid',
-            'totalDue',
-            'recentInvoices',
-            'recentPayments',
-            'invoiceChartData',
-            'labels',
-            'amounts'
-        ));
+        return view('clients.dashboard', [
+            'totalInvoices'    => $stats->count ?? 0,
+            'totalFactured'    => $stats->total_factured ?? 0,
+            'totalPaid'        => $stats->total_paid ?? 0,
+            'totalDue'         => $stats->total_due ?? 0,
+            'recentInvoices'   => $recentInvoices,
+            'recentPayments'   => $recentPayments,
+            'invoiceChartData' => ['paid' => $paidCount, 'unpaid' => $unpaidCount],
+            'labels'           => $labels,
+            'amounts'          => $amounts,
+        ]);
     }
 }
