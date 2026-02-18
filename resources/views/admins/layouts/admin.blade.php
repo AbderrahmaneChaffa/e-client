@@ -10,14 +10,14 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
     <style>
         .sidebar-nav a.active {
-            background-color: rgb(59, 130, 246);
-            border-left: 4px solid rgb(147, 197, 253);
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-left: 4px solid #a78bfa;
             padding-left: calc(1.5rem - 4px);
         }
         
         .sidebar-nav a:hover {
-            background-color: rgba(59, 130, 246, 0.1);
-            border-left: 4px solid rgb(59, 130, 246);
+            background-color: rgba(102, 126, 234, 0.15);
+            border-left: 4px solid #667eea;
             padding-left: calc(1.5rem - 4px);
         }
 
@@ -45,11 +45,11 @@
         <aside class="w-64 bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 text-white flex-shrink-0 shadow-lg">
             <!-- Logo -->
             <div class="p-6 text-center border-b border-slate-700">
-                <div class="flex items-center justify-center mb-2">
-                    <i class="fa-solid fa-ship text-3xl text-blue-400"></i>
+                <div class="flex items-center justify-center mb-3">
+                    <img src="{{ asset('storage/Logo/petit taille.png') }}" alt="Logo EPO" class="h-12 w-auto">
                 </div>
-                <h1 class="font-bold text-xl text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-blue-300">E-Client</h1>
-                <p class="text-xs text-slate-400 mt-1">Gestion Maritime</p>
+                <h1 class="font-bold text-lg text-white">E-Client EPO</h1>
+                <p class="text-xs text-slate-400 mt-1">Administration</p>
             </div>
 
             <!-- Navigation -->
@@ -91,29 +91,32 @@
         <!-- Main Content -->
         <div class="flex-1 flex flex-col overflow-hidden">
             <!-- Header -->
-            <header class="bg-white shadow-md border-b border-gray-200">
+            <header class="bg-gradient-to-r from-indigo-600 to-purple-700 shadow-lg border-b-4 border-indigo-800">
                 <div class="px-8 py-4 flex items-center justify-between">
                     <div class="flex items-center gap-4">
-                        <h1 class="text-2xl font-bold text-gray-800">{{ env('APP_NAME', 'E-Client') }}</h1>
-                        <p class="text-gray-500 text-sm">Administration</p>
+                        <img src="{{ asset('storage/Logo/petit taille.png') }}" alt="Logo" class="h-10 w-auto">
+                        <div>
+                            <h1 class="text-2xl font-bold text-white">{{ env('APP_NAME', 'E-Client') }}</h1>
+                            <p class="text-indigo-100 text-sm">Administration</p>
+                        </div>
                     </div>
 
                     <div class="flex items-center gap-6">
                         <!-- Date & Time -->
                         <div class="text-right hidden md:block">
-                            <p class="text-sm font-medium text-gray-800" id="current-date">{{ now()->format('d M Y') }}</p>
-                            <p class="text-xs text-gray-500" id="current-time">{{ now()->format('H:i') }}</p>
+                            <p class="text-sm font-medium text-white" id="current-date">{{ now()->format('d M Y') }}</p>
+                            <p class="text-xs text-indigo-100" id="current-time">{{ now()->format('H:i') }}</p>
                         </div>
 
                         <!-- User Profile Dropdown -->
                         <div class="relative group">
-                            <button class="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-gray-100 transition">
-                                <div class="w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center text-white font-bold">
+                            <button class="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-indigo-500/50 transition">
+                                <div class="w-10 h-10 bg-white rounded-full flex items-center justify-center text-indigo-600 font-bold">
                                     {{ strtoupper(substr(auth()->user()->name, 0, 1)) }}
                                 </div>
                                 <div class="text-left hidden sm:block">
-                                    <p class="text-sm font-semibold text-gray-800">{{ auth()->user()->name }}</p>
-                                    <p class="text-xs text-gray-500">Admin</p>
+                                    <p class="text-sm font-semibold text-white">{{ auth()->user()->name }}</p>
+                                    <p class="text-xs text-indigo-100">Admin</p>
                                 </div>
                             </button>
 

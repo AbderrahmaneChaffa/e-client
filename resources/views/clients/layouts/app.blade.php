@@ -10,8 +10,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
-            --primary: #0ea5e9;
-            --primary-dark: #0284c7;
+            --primary: #667eea;
+            --primary-dark: #5568d3;
             --success: #10b981;
             --danger: #ef4444;
             --warning: #f59e0b;
@@ -49,7 +49,7 @@
         .sidebar-link:hover,
         .sidebar-link.active {
             color: var(--primary);
-            background-color: rgba(14, 165, 233, 0.1);
+            background-color: rgba(102, 126, 234, 0.1);
             border-left-color: var(--primary);
         }
 
@@ -66,19 +66,19 @@
         }
 
         .topbar {
-            background: white;
-            border-bottom: 1px solid #e5e7eb;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-bottom: 4px solid #5568d3;
             padding: 16px 24px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
         }
 
         .topbar-title {
             font-size: 24px;
             font-weight: bold;
-            color: var(--dark);
+            color: white;
         }
 
         .main-content {
@@ -146,7 +146,7 @@
         .btn-primary:hover {
             background: var(--primary-dark);
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
         }
 
         .btn-secondary {
@@ -192,7 +192,7 @@
         .form-select:focus {
             outline: none;
             border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
 
         .table {
@@ -291,8 +291,11 @@
 <body>
     <div class="sidebar" id="sidebar">
         <div style="padding: 24px; border-bottom: 1px solid #334155;">
-            <h1 style="color: var(--primary); font-size: 24px; font-weight: bold; margin: 0;">E-Client</h1>
-            <p style="color: #94a3b8; font-size: 12px; margin: 4px 0 0 0;">Portail Client</p>
+            <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 8px;">
+                <img src="{{ asset('storage/Logo/petit taille.png') }}" alt="Logo" style="height: 32px; width: auto;">
+                <h1 style="color: white; font-size: 18px; font-weight: bold; margin: 0;">E-Client</h1>
+            </div>
+            <p style="color: #94a3b8; font-size: 12px; margin: 4px 0 0 0; text-align: center;">Portail Client</p>
         </div>
 
         <nav style="padding-top: 16px;">
@@ -338,10 +341,10 @@
             <div class="topbar-title">@yield('page-title')</div>
             <div style="display: flex; align-items: center; gap: 16px;">
                 <div style="text-align: right;">
-                    <p style="margin: 0; font-weight: 600;">{{ Auth::user()->name ?? 'Client' }}</p>
-                    <p style="margin: 4px 0 0 0; font-size: 12px; color: #6b7280;">{{ Auth::user()->email ?? '' }}</p>
+                    <p style="margin: 0; font-weight: 600; color: white;">{{ Auth::user()->name ?? 'Client' }}</p>
+                    <p style="margin: 4px 0 0 0; font-size: 12px; color: #e0e7ff;">{{ Auth::user()->email ?? '' }}</p>
                 </div>
-                <img src="https://ui-avatars.com/api/?name={{ urlencode(Auth::user()->name ?? 'Client') }}&background=0ea5e9&color=fff" alt="Avatar" style="width: 40px; height: 40px; border-radius: 50%;">
+                <img src="https://ui-avatars.com/api/?name={{ urlencode(Auth::user()->name ?? 'Client') }}&background=667eea&color=fff" alt="Avatar" style="width: 40px; height: 40px; border-radius: 50%; border: 2px solid white;">
             </div>
         </div>
 
