@@ -26,7 +26,7 @@ class FactureController extends Controller
             }
         }
 
-        $factures = $query->orderBy('date_facture', 'desc')->paginate(15)->withQueryString();
+        $factures = $query->orderBy('date_facture', 'desc')->paginate(100)->withQueryString();
 
         return view('clients.factures.index', compact('factures'));
     }

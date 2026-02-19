@@ -28,7 +28,7 @@
     </form>
 
     <div class="overflow-x-auto">
-        <table class="w-full text-left border-collapse">
+        <table class="table w-full text-left border-collapse">
             <thead>
                 <tr class="bg-gray-50 text-gray-600 text-xs uppercase font-semibold">
                     <th class="p-4 border-b">Date</th>

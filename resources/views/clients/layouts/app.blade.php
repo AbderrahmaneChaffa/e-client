@@ -286,6 +286,8 @@
         }
     </style>
     @yield('extra-css')
+    <!-- DataTables CSS -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
 </head>
 
 <body>
@@ -385,6 +387,28 @@
             window.toggleSidebar = function() {
                 sidebar.classList.toggle('active');
             };
+        });
+    </script>
+    <!-- jQuery + DataTables -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            if (typeof jQuery !== 'undefined' && typeof jQuery.fn.DataTable !== 'undefined') {
+                jQuery('table.table').each(function () {
+                    if (!jQuery.fn.DataTable.isDataTable(this)) {
+                        jQuery(this).DataTable({
+                            responsive: true,
+                            pageLength: 20,
+                            lengthMenu: [5, 10, 25, 50, 100],
+                            order: [],
+                            language: {
+                                url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/fr-FR.json'
+                            }
+                        });
+                    }
+                });
+            }
         });
     </script>
     @yield('extra-js')

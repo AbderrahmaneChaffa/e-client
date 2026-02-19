@@ -26,7 +26,7 @@ class PaiementController extends Controller
             $query->where('banque', $request->banque);
         }
 
-        $paiements = $query->orderBy('date_paiement', 'desc')->paginate(20)->withQueryString();
+        $paiements = $query->orderBy('date_paiement', 'desc')->paginate(100)->withQueryString();
 
         return view('clients.paiements.index', compact('paiements'));
     }

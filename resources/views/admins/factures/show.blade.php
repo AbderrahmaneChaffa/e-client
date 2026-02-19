@@ -25,7 +25,7 @@
             <div>
                 <h3 class="text-xs uppercase font-bold text-gray-400 mb-2">Information Client</h3>
                 <p class="font-bold text-gray-800">{{ $facture->client->name }}</p>
-                <p class="text-sm text-gray-600">Code: {{ $facture->client->code }}</p>
+                <p class="text-sm text-gray-600">Code: {{ $facture->client->code_client }}</p>
                 <p class="text-sm text-gray-600">NIS: {{ $facture->client->nis }}</p>
             </div>
             <div>
@@ -54,7 +54,7 @@
             <tbody class="text-sm">
                 @foreach($facture->prestations as $item)
                 <tr class="border-b last:border-0">
-                    <td class="p-4 font-medium">{{ $item->designation }} <span class="text-gray-400 text-xs ml-2">({{ $item->code_produit }})</span></td>
+                    <td class="p-4 font-medium">{{ $item->libelle }} <span class="text-gray-400 text-xs ml-2">({{ $item->code_produit }})</span></td>
                     <td class="p-4 text-center">{{ $item->quantite }}</td>
                     <td class="p-4 text-right">{{ number_format($item->prix_unitaire, 2) }}</td>
                     <td class="p-4 text-right font-bold">{{ number_format($item->total_ht, 2) }}</td>
@@ -95,7 +95,7 @@
                 <tr class="border-b last:border-0">
                     <td class="p-4">{{ $pay->date_paiement }}</td>
                     <td class="p-4">
-                        <span class="font-bold">{{ $pay->reference_recu }}</span><br>
+                        <span class="font-bold">{{ $pay->recu }}</span><br>
                         <span class="text-xs text-gray-500">Chq: {{ $pay->numero_cheque }}</span>
                     </td>
                     <td class="p-4">{{ $pay->banque }}</td>

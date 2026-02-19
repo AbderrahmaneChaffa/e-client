@@ -30,7 +30,7 @@ class ClientController extends Controller
         $sortDir = $request->input('dir', 'asc');
         $query->orderBy($sortBy, $sortDir);
 
-        $clients = $query->paginate(15);
+        $clients = $query->paginate(100)->withQueryString();
 
         return view('admins.clients.index', compact('clients'));
     }

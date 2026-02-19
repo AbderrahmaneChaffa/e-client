@@ -36,7 +36,7 @@ class FactureController extends Controller
         }
 
         // 5. Tri et Pagination ultra-rapide
-        $factures = $query->orderBy('date_facture', 'desc')->paginate(15)->withQueryString();
+        $factures = $query->orderBy('date_facture', 'desc')->paginate(100)->withQueryString();
 
         $clients = Client::select('id', 'name')->orderBy('name')->get();
 
