@@ -16,7 +16,7 @@
             border-left: 4px solid #a78bfa;
             padding-left: calc(1.5rem - 4px);
         }
-        
+
         .sidebar-nav a:hover {
             background-color: rgba(102, 126, 234, 0.15);
             border-left: 4px solid #667eea;
@@ -183,9 +183,9 @@
         // Update time every second
         function updateTime() {
             const now = new Date();
-            document.getElementById('current-time').textContent = now.toLocaleTimeString('fr-FR', { 
-                hour: '2-digit', 
-                minute: '2-digit' 
+            document.getElementById('current-time').textContent = now.toLocaleTimeString('fr-FR', {
+                hour: '2-digit',
+                minute: '2-digit'
             });
         }
         setInterval(updateTime, 1000);
@@ -195,9 +195,9 @@
     <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
     <script>
         // Initialize DataTables on every table with class "table"
-        document.addEventListener('DOMContentLoaded', function () {
+        document.addEventListener('DOMContentLoaded', function() {
             if (typeof jQuery !== 'undefined' && typeof jQuery.fn.DataTable !== 'undefined') {
-                jQuery('table.table').each(function () {
+                jQuery('table.table').each(function() {
                     if (!jQuery.fn.DataTable.isDataTable(this)) {
                         jQuery(this).DataTable({
                             responsive: true,
