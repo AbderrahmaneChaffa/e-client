@@ -1,12 +1,12 @@
 <x-guest-layout>
     <div class="login-container px-8 py-10">
         <!-- Logo Section -->
-        <div class="logo-section">
+        <div class="logo-section flex justify-center mb-8">
             <img src="{{ asset('storage/Logo/logo_epo.png') }}" alt="Logo EPO">
         </div>
 
         <!-- Title -->
-        <h1 class="form-title">Welcome Back</h1>
+        <!-- <h1 class="form-title">Welcome Back</h1> -->
         <p class="form-subtitle">Sign in to your account</p>
 
         <!-- Session Status -->
