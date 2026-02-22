@@ -54,7 +54,7 @@
             <tbody class="text-sm">
                 @foreach($facture->prestations as $item)
                 <tr class="border-b last:border-0">
-                    <td class="p-4 font-medium">{{ $item->libelle }} <span class="text-gray-400 text-xs ml-2">({{ $item->code_produit }})</span></td>
+                    <td class="p-4 font-medium">{{ $item->libelle }} <span class="text-gray-400 text-xs ml-2">({{ $item->article }})</span></td>
                     <td class="p-4 text-center">{{ $item->quantite }}</td>
                     <td class="p-4 text-right">{{ number_format($item->prix_unitaire, 2) }}</td>
                     <td class="p-4 text-right font-bold">{{ number_format($item->total_ht, 2) }}</td>
