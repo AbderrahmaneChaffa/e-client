@@ -33,11 +33,15 @@
             <thead>
                 <tr class="bg-gray-100 text-gray-600 text-xs uppercase font-semibold">
                     <th class="p-4 border-b">N° Facture</th>
-                    <th class="p-4 border-b">Client</th>
                     <th class="p-4 border-b">Date</th>
-                    <th class="p-4 border-b">Total TTC</th>
-                    <th class="p-4 border-b">Reste</th>
+                    <th class="p-4 border-b">Client</th>
+                    <th class="p-4 border-b">D. Mises en ligne</th>
                     <th class="p-4 border-b">Statut</th>
+                    <th class="p-4 border-b">T. HT</th>
+                    <th class="p-4 border-b">T. TVA</th>
+                    <th class="p-4 border-b">T. TTC</th>
+                    <th class="p-4 border-b">Reste</th>
+
                     <th class="p-4 border-b text-center">Actions</th>
                 </tr>
             </thead>
@@ -45,10 +49,9 @@
                 @foreach($factures as $facture)
                 <tr class="hover:bg-gray-50 transition">
                     <td class="p-4 border-b font-medium text-blue-600">{{ $facture->numero_facture }}</td>
-                    <td class="p-4 border-b">{{ $facture->client->name }}</td>
                     <td class="p-4 border-b">{{ $facture->date_facture->format('d/m/Y') }}</td>
-                    <td class="p-4 border-b font-bold">{{ number_format($facture->total_ttc, 2) }} DA</td>
-                    <td class="p-4 border-b text-red-500">{{ number_format($facture->reste_a_payer, 2) }} DA</td>
+                    <td class="p-4 border-b">{{ $facture->client->name }}</td>
+                    <td class="p-4 border-b">{{ $facture->created_at->format('d/m/Y H:i') }}</td>
                     <td class="p-4 border-b">
                         @if($facture->reste_a_payer <= 0)
                             <span class="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-bold">Payée</span>
@@ -56,6 +59,10 @@
                             <span class="bg-red-100 text-red-700 px-2 py-1 rounded-full text-xs font-bold">Impayée</span>
                             @endif
                     </td>
+                    <td class="p-4 border-b font-bold">{{ number_format($facture->total_ht, 2) }} DA</td>
+                    <td class="p-4 border-b font-bold">{{ number_format($facture->total_tva, 2) }} DA</td>
+                    <td class="p-4 border-b font-bold">{{ number_format($facture->total_ttc, 2) }} DA</td>
+                    <td class="p-4 border-b font-bold text-red-500">{{ number_format($facture->reste_a_payer, 2) }} DA</td>
                     <td class="p-4 border-b text-center">
                         <a href="{{ route('admin.factures.show', $facture) }}" class="text-gray-400 hover:text-blue-600 mx-1">
                             <i class="fa-solid fa-eye"></i>
