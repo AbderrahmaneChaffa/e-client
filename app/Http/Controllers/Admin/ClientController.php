@@ -30,7 +30,7 @@ class ClientController extends Controller
         $sortDir = $request->input('dir', 'asc');
         $query->orderBy($sortBy, $sortDir);
 
-        $clients = $query->paginate(100)->withQueryString();
+        $clients = $query->paginate(100);
 
         return view('admins.clients.index', compact('clients'));
     }
@@ -51,7 +51,11 @@ class ClientController extends Controller
         $validated = $request->validate([
             'code_client' => 'required|string|unique:clients|max:50',
             'name' => 'required|string|max:255',
+            'email' => 'nullable|email|max:255',
+            'adresse' => 'nullable|string|max:255',
+            'telephone' => 'nullable|string|max:20',
             'nis' => 'nullable|string|max:50',
+            'nif' => 'nullable|string|max:50',
             'rc' => 'nullable|string|max:50',
             'ai' => 'nullable|string|max:50',
         ]);
@@ -87,7 +91,11 @@ class ClientController extends Controller
         $validated = $request->validate([
             'code_client' => 'required|string|max:50|unique:clients,code_client,' . $client->id,
             'name' => 'required|string|max:255',
+            'email' => 'nullable|email|max:255',
+            'adresse' => 'nullable|string|max:255',
+            'telephone' => 'nullable|string|max:20',
             'nis' => 'nullable|string|max:50',
+            'nif' => 'nullable|string|max:50',
             'rc' => 'nullable|string|max:50',
             'ai' => 'nullable|string|max:50',
         ]);

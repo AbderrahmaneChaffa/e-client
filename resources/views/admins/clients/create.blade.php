@@ -1,7 +1,7 @@
 @extends('admins.layouts.admin')
 
 @section('content')
-<div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 max-w-2xl">
+<div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mx-auto">
     <h2 class="text-xl font-bold text-gray-800 mb-6">
         @if(isset($client))
         Modifier le client
@@ -49,7 +49,48 @@
                 <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
                 @enderror
             </div>
-
+            <!-- Adresse -->
+            <div>
+                <label for="adresse" class="block text-sm font-medium text-gray-700 mb-1">Adresse</label>
+                <input
+                    type="text"
+                    name="adresse"
+                    id="adresse"
+                    value="{{ old('adresse', $client->adresse ?? '') }}"
+                    placeholder="Adresse du client"
+                    class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent @error('adresse') border-red-500 @enderror">
+                @error('adresse')
+                <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
+                @enderror
+            </div>
+            <!-- Email -->
+            <div>
+                <label for="email" class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <input
+                    type="email"
+                    name="email"
+                    id="email"
+                    value="{{ old('email', $client->email ?? '') }}"
+                    placeholder="Adresse email du client"
+                    class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent @error('email') border-red-500 @enderror">
+                @error('email')
+                <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
+                @enderror
+            </div>
+            <!-- Telephone -->
+            <div>
+                <label for="telephone" class="block text-sm font-medium text-gray-700 mb-1">Téléphone</label>
+                <input
+                    type="text"
+                    name="telephone"
+                    id="telephone"
+                    value="{{ old('telephone', $client->telephone ?? '') }}"
+                    placeholder="Numéro de téléphone du client"
+                    class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent @error('telephone') border-red-500 @enderror">
+                @error('telephone')
+                <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
+                @enderror
+            </div>
             <!-- NIS -->
             <div>
                 <label for="nis" class="block text-sm font-medium text-gray-700 mb-1">NIS</label>
@@ -61,6 +102,20 @@
                     placeholder="Numéro d'identification statistique"
                     class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent @error('nis') border-red-500 @enderror">
                 @error('nis')
+                <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
+                @enderror
+            </div>
+            <!-- NIF -->
+            <div>
+                <label for="nif" class="block text-sm font-medium text-gray-700 mb-1">NIF</label>
+                <input
+                    type="text"
+                    name="nif"
+                    id="nif"
+                    value="{{ old('nif', $client->nif ?? '') }}"
+                    placeholder="Numéro d'identification fiscal"
+                    class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent @error('nif') border-red-500 @enderror">
+                @error('nif')
                 <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
                 @enderror
             </div>

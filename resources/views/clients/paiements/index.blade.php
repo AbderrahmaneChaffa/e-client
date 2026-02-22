@@ -34,7 +34,10 @@
                 <tr class="hover:bg-gray-50 transition border-b">
                     <td class="p-4">{{ $p->date_paiement }}</td>
                     <td class="p-4">{{ $p->facture->numero_facture ?? '-' }}</td>
-                    <td class="p-4">{{ $p->recu }}</td>
+                    <td class="p-4">
+                        <div class="text-xs text-gray-500 italic">Recu: {{ $p->recu }}</div>
+                        <div class="text-xs font-bold">Chq: {{ $p->numero_cheque }}</div>
+                    </td>
                     <td class="p-4">{{ $p->banque }}</td>
                     <td class="p-4 text-right font-bold text-green-600">+ {{ number_format($p->montant, 2) }} DA</td>
                 </tr>
