@@ -41,7 +41,7 @@ class PaiementsImport implements ToModel, WithHeadingRow, WithChunkReading, With
         // parse date
         $datePaiement = $this->transformDate($row['date'] ?? $row['date_paiement'] ?? null);
 
-        $montant = (float) ($row['montant'] ?? $row['montant_verse'] ?? 0);
+        $montant = (float) ($row['montant'] ?? $row['montant'] ?? 0);
         if ($montant <= 0) {
             return null;
         }
@@ -50,10 +50,10 @@ class PaiementsImport implements ToModel, WithHeadingRow, WithChunkReading, With
         $paiement = new Paiement([
             'facture_id'    => $facture->id,
             'date_paiement' => $datePaiement,
-            'reference_recu'=> $row['reference'] ?? $row['reference_recu'] ?? null,
+            'recu' => $row['recu'] ?? $row['recu'] ?? null,
             'numero_cheque' => $row['numero_cheque'] ?? null,
             'banque'        => $row['banque'] ?? null,
-            'montant_verse' => $montant,
+            'montant' => $montant,
             'created_at'    => now(),
             'updated_at'    => now(),
         ]);
