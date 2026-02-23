@@ -13,7 +13,7 @@ class FactureController extends Controller
      */
     public function index(Request $request)
     {
-        // 1. Query de base avec relations pour éviter 20 000 requêtes SQL
+        // 1. Query de base avec relations pour éviter 20 000 requêtes SQLhhh
         $query = Facture::with(['client', 'navire']);
 
         // 2. Filtre par numéro de facture
