@@ -13,7 +13,7 @@ class DashboardController extends Controller
 {
     public function index()
     {
-        // Statistiques principales
+        // Statistiques principaleshh
         $stats = Facture::query()
             ->selectRaw('
                 COUNT(*) as total_count,
@@ -98,4 +98,3 @@ class DashboardController extends Controller
         ));
     }
 }
-
