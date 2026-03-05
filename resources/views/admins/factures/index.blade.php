@@ -67,7 +67,9 @@
                         <a href="{{ route('admin.factures.show', $facture) }}" class="text-gray-400 hover:text-blue-600 mx-1">
                             <i class="fa-solid fa-eye"></i>
                         </a>
-                        <a href="#" class="text-gray-400 hover:text-green-600 mx-1"><i class="fa-solid fa-print"></i></a>
+                        <a href="{{ route('admin.factures.print', $facture->id) }}" target="_blank" class="text-gray-400 hover:text-green-600 mx-1 transition-colors" title="Imprimer la facture">
+                            <i class="fa-solid fa-print"></i>
+                        </a>
                     </td>
                 </tr>
                 @endforeach

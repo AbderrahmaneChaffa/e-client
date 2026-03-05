@@ -18,11 +18,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/admin/dashboard', [DashboardController::class, 'index'])
             ->name('admin.dashboard');
         Route::get('/factures', [FactureController::class, 'index'])->name('admin.factures.index');
-        Route::get('/paiements', [PaiementController::class, 'index'])->name('admin.paiements.index');
         Route::get('/factures/{facture}', [FactureController::class, 'show'])->name('admin.factures.show');
+        Route::get('/factures/{facture}/print', [FactureController::class, 'print'])->name('admin.factures.print');
         // MODULE IMPORTATION EXCEL
         Route::get('/imports', [ImportController::class, 'index'])->name('admin.imports.index');
         // import factures and paiements separately
+        Route::get('/paiements', [PaiementController::class, 'index'])->name('admin.paiements.index');
+
         Route::get('/imports/template/factures', [ImportController::class, 'templateFactures'])->name('admin.imports.template.factures');
         Route::post('/imports/factures', [ImportController::class, 'storeFactures'])->name('admin.imports.factures');
         Route::get('/imports/template/paiements', [ImportController::class, 'templatePaiements'])->name('admin.imports.template.paiements');

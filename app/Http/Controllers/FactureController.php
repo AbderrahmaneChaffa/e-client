@@ -5,6 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\Client;
 use App\Models\Facture;
 use Illuminate\Http\Request;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Facades\Auth;
+use App\Helpers\NumberHelper;
 
 class FactureController extends Controller
 {
@@ -42,7 +45,40 @@ class FactureController extends Controller
 
         return view('admins.factures.index', compact('factures', 'clients'));
     }
+    public function print(Facture $facture)
+    {
+        if ($facture->annuler) {
+            return redirect()->back()->with('error', 'Impossible d\'imprimer une facture annulée.');
+        }
 
+        $facture->load(['client', 'navire', 'prestations', 'paiements']);
+
+        if (!$facture->imprimer) {
+            $facture->update([
+                'imprimer' => true,
+                'date_impression' => now(),
+                'imprime_par' => Auth::id(),
+            ]);
+        }
+
+        // --- NOUVEAU : Conversion du montant en lettres ---
+        $montant = $facture->total_ttc;
+        $dinars = floor($montant); // Partie entière
+        $centimes = round(($montant - $dinars) * 100); // Partie décimale
+
+        // Utilisation du formateur PHP natif en Français
+
+        $montantEnLettres = NumberHelper::enLettres($facture->total_ttc);
+
+        // --------------------------------------------------
+
+        // On passe la nouvelle variable 'montantEnLettres' à la vue
+        $pdf = Pdf::loadView('admins.factures.pdf', compact('facture', 'montantEnLettres'));
+
+        $pdf->setPaper('a4', 'portrait');
+
+        return $pdf->stream('Facture_' . $facture->numero . '.pdf');
+    }
     /**
      * Show the form for creating a new resource.
      */
