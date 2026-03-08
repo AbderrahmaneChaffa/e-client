@@ -321,7 +321,8 @@
         }
 
         .payment-value {
-            color: #555;
+            /* color: #555; */
+            color: #ff0000;
             padding: 5px 8px;
             background-color: white;
             border: 1px solid #ddd;
@@ -502,18 +503,22 @@
                     <div class="payment-item">
                         <div class="payment-label">Mode de Paiement :</div>
                         <div class="payment-value">
-                            @if($facture->mode_paiement ?? null)
-                            {{ $facture->mode_paiement }}
-                            @else
-                            Virement Bancaire / Chèque
-                            @endif
+                            @php
+                            $modes = [
+                            1 => 'Virement',
+                            2 => 'Chèque',
+                            3 => 'Espèce'
+                            ];
+                            @endphp
+
+                            {{ $modes[$facture->mode_paiement] ?? 'Virement Bancaire / Chèque' }}
                         </div>
                     </div>
                 </div>
                 <div class="payment-col last">
                     <div class="payment-item">
                         <div class="payment-label">Client en Compte :</div>
-                        <div class="payment-value">
+                        <div class="payment-value font-red-500">
                             @if($facture->client->en_compte ?? false)
                             Oui
                             @else
