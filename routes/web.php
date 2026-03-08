@@ -20,6 +20,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/factures', [FactureController::class, 'index'])->name('admin.factures.index');
         Route::get('/factures/{facture}', [FactureController::class, 'show'])->name('admin.factures.show');
         Route::get('/factures/{facture}/print', [FactureController::class, 'print'])->name('admin.factures.print');
+
         // MODULE IMPORTATION EXCEL
         Route::get('/imports', [ImportController::class, 'index'])->name('admin.imports.index');
         // import factures and paiements separately
@@ -46,6 +47,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('client.factures.index');
         Route::get('/client/factures/{facture}', [\App\Http\Controllers\Client\FactureController::class, 'show'])
             ->name('client.factures.show');
+        Route::get('/factures/{facture}/print', [FactureController::class, 'print'])->name('client.factures.print');
 
         Route::get('/client/paiements', [\App\Http\Controllers\Client\PaiementController::class, 'index'])
             ->name('client.paiements.index');

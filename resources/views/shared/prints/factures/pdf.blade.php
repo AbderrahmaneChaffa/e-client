@@ -343,6 +343,49 @@
             color: #003d99;
             text-transform: uppercase;
         }
+
+        /* Conteneur principal pour l'en-tête de contenu */
+        .invoice-header-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+            border: none;
+        }
+
+        .invoice-header-table td {
+            border: none;
+            vertical-align: middle;
+        }
+
+        /* Cellule de gauche (vide pour équilibrer le centrage ou pour un petit logo) */
+        .col-left {
+            width: 25%;
+        }
+
+        /* Cellule du milieu (Centrée) */
+        .col-center {
+            width: 50%;
+            text-align: center;
+        }
+
+        /* Cellule de droite (Alignée à droite) */
+        .col-right {
+            width: 25%;
+            text-align: right;
+            font-size: 14px;
+        }
+
+        .facture-title {
+            font-size: 18px;
+            font-weight: bold;
+            text-decoration: underline;
+            margin-bottom: 5px;
+        }
+
+        .facture-number {
+            font-size: 16px;
+            font-weight: bold;
+        }
     </style>
 </head>
 
@@ -359,17 +402,20 @@
     <main>
 
         <!-- En-tête avec numéro de facture -->
-        <!-- <div class="header-content">
-            <div class="header-left">
-                <div class="facture-title">FACTURE DE PRESTATIONS PORTUAIRES</div>
-                <div class="facture-number">N° {{ $facture->numero_facture ?? 'N/A' }}</div>
-            </div>
-            <div class="header-right">
-                <div class="facture-number">
+        <table class="invoice-header-table">
+            <tr>
+                <td class="col-left"></td>
+
+                <td class="col-center">
+                    <div class="facture-title">FACTURE DE PRESTATIONS PORTUAIRES</div>
+                    <div class="facture-number">N° {{ $facture->numero_facture ?? $facture->id }}</div>
+                </td>
+
+                <td class="col-right">
                     <strong>Date :</strong> {{ $facture->date_facture ? \Carbon\Carbon::parse($facture->date_facture)->format('d/m/Y') : date('d/m/Y') }}
-                </div>
-            </div>
-        </div> -->
+                </td>
+            </tr>
+        </table>
 
         <!-- Informations générales -->
         <div class="info-box">

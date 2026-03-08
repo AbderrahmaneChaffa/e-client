@@ -73,7 +73,7 @@ class FactureController extends Controller
         // --------------------------------------------------
 
         // On passe la nouvelle variable 'montantEnLettres' à la vue
-        $pdf = Pdf::loadView('admins.factures.pdf', compact('facture', 'montantEnLettres'));
+        $pdf = Pdf::loadView('shared.prints.factures.pdf', compact('facture', 'montantEnLettres'));
 
         $pdf->setPaper('a4', 'portrait');
 
