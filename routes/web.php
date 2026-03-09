@@ -34,6 +34,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/admin/imports/upload-temp', [ImportController::class, 'uploadTemp'])->name('admin.imports.upload-temp');
         Route::post('/admin/imports/store', [ImportController::class, 'storeFactures']); // alias to factures
 
+        //  <!-- {{ route('admin.factures.cancel', $facture->id) }} --> --- IGNORE ---
+        //<!-- {{ route('admin.factures.send-email', $facture->id) }} --> --- IGNORE ---
+        //<!-- {{ route('admin.factures.history', $facture->id) }} --> --- IGNORE --- 
+        //<!-- {{ route('admin.factures.edit', $facture) }} --> --- IGNORE ---    
+
         // GESTION DES CLIENTS
         Route::resource('/admin/clients', ClientController::class, ['as' => 'admin']);
     });

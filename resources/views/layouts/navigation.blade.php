@@ -6,7 +6,7 @@
                 <!-- Logo -->
                 <div class="shrink-0 flex items-center">
                     <a href="{{ route('dashboard') }}" class="flex items-center hover:opacity-80 transition">
-                        <img src="{{ asset('storage/Logo/petit taille.png') }}" alt="Logo" class="h-10 w-auto mr-3">
+                        <img src="{{ asset('storage/Logo/logo_epo.png') }}" alt="Logo" class="h-10 w-auto mr-3">
                         <span class="text-white font-bold text-lg hidden sm:inline">{{ config('app.name', 'EPO') }}</span>
                     </a>
                 </div>
@@ -44,7 +44,7 @@
                             @csrf
 
                             <x-dropdown-link :href="route('logout')"
-                                    onclick="event.preventDefault();
+                                onclick="event.preventDefault();
                                                 this.closest('form').submit();">
                                 {{ __('Log Out') }}
                             </x-dropdown-link>
@@ -90,7 +90,7 @@
                     @csrf
 
                     <x-responsive-nav-link :href="route('logout')"
-                            onclick="event.preventDefault();
+                        onclick="event.preventDefault();
                                         this.closest('form').submit();" class="text-white hover:bg-indigo-600">
                         {{ __('Log Out') }}
                     </x-responsive-nav-link>
