@@ -29,7 +29,8 @@ class FactureFactory extends Factory
         );
 
         return [
-            'numero_facture' => $numero,
+            //'numero_facture' => $numero,
+            'numero_facture' => $this->faker->unique()->bothify('2026T#########'), // Format : 2026T0000000001
             'date_facture' => $this->faker->dateTimeBetween('-1 year', 'now'),
             'date_mise_en_ligne' => now(),
             'mode_paiement' => $this->faker->randomElement(['1', '2', '3']),
@@ -38,7 +39,7 @@ class FactureFactory extends Factory
             'pour' => $this->faker->company(),
             'devise' => $this->faker->randomElement(['DA', 'USD', 'EUR']),
             'taux_devise' => $this->faker->randomFloat(4, 0.1, 2), // Taux de change
-            'annuler' => $this->faker->boolean(), 
+            'annuler' => $this->faker->boolean(),
             'motif_annulation' =>   $this->faker->boolean() ? $this->faker->sentence() : null,
             'date_annulation' => $this->faker->boolean() ? $this->faker->dateTimeBetween('-1 year', 'now') : null,
             'annule_par' => $this->faker->boolean() ? 1 : null,

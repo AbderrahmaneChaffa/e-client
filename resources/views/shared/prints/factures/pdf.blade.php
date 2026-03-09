@@ -448,12 +448,10 @@
                 <div class="client-box">
                     <p><strong>{{ $facture->client->name ?? 'N/A' }}</strong></p>
                     <p><strong>Code Client :</strong> {{ $facture->client->code_client ?? 'N/A' }}</p>
-                    <p style="margin-top: 8px;"><strong>Adresse :</strong> {{ $facture->client->adresse ?? 'Non renseignée' }}</p>
-                    <p><strong>NIF :</strong> {{ $facture->client->nif ?? 'N/A' }}</p>
+                    <p style="margin-top: 8px;"><strong>Adresse :</strong> {{ $facture->client->adresse ?? '---' }}</p>
+                    <p><strong>NIS :</strong> {{ $facture->client->nis ?? 'N/A' }}</p>
                     <p><strong>RC :</strong> {{ $facture->client->rc ?? 'N/A' }}</p>
-                    @if($facture->client->artisan ?? null)
-                    <p><strong>N° Artisan :</strong> {{ $facture->client->artisan }}</p>
-                    @endif
+                    <p><strong>AI :</strong> {{ $facture->client->ai }}</p>
                 </div>
             </div>
         </div>
@@ -480,18 +478,18 @@
                 @forelse($facture->prestations as $index => $prestation)
                 <tr>
                     <td class="text-center">{{ $prestation->code ?? 'PRE-' . ($index + 1) }}</td>
-                    <td class="text-left">{{ $prestation->designation ?? $prestation->produit->nom ?? 'Prestation Portuaire' }}</td>
+                    <td class="text-left">{{ $prestation->libelle ?? 'Prestation Portuaire' }}</td>
                     <td class="text-center">{{ $prestation->quantite ?? 1 }}</td>
-                    <td class="text-right">{{ number_format($prestation->prix_unitaire ?? $prestation->pu ?? 0, 2, ',', ' ') }}</td>
+                    <td class="text-right">{{ number_format($prestation->prix_unitaire ?? 0, 2, ',', ' ') }}</td>
                     <td class="text-center">{{ $prestation->taux_jrs ?? '-' }}</td>
-                    <td class="text-right"><strong>{{ number_format($prestation->total_ht ?? $prestation->montant ?? 0, 2, ',', ' ') }}</strong></td>
+                    <td class="text-right"><strong>{{ number_format($prestation->total_ht ??  0, 2, ',', ' ') }}</strong></td>
                     <!-- <td class="text-center">{{ $prestation->taux_tva ?? '19%' }}</td> -->
                 </tr>
                 @php
-                $total_ht += $prestation->total_ht ?? $prestation->montant ?? 0;
-                $tva_amount = ($prestation->total_ht ?? $prestation->montant ?? 0) * 0.19;
+                $total_ht += $prestation->total_ht ?? 0;
+                $tva_amount = ($prestation->total_ht ?? 0) * 0.19;
                 $total_tva += $tva_amount;
-                $total_ttc += ($prestation->total_ht ?? $prestation->montant ?? 0) + $tva_amount;
+                $total_ttc += ($prestation->total_ht ?? 0) + $tva_amount;
                 @endphp
                 @empty
                 <tr>
@@ -519,7 +517,7 @@
                     </tr>
                     <tr>
                         <td class="label">TVA (19%) :</td>
-                        <td class="value">{{ number_format($total_tva ?? $facture->tva ?? 0, 2, ',', ' ') }} DA</td>
+                        <td class="value">{{ number_format($total_tva ??  0, 2, ',', ' ') }} DA</td>
                     </tr>
                     <tr class="total-row">
                         <td class="label">TOTAL T.T.C :</td>

@@ -30,6 +30,8 @@ class DatabaseSeeder extends Seeder
             'password' => bcrypt('password'),
             'role' => 'client',
         ]);
+        $admin = User::where('email', 'admin@e-client.com')->first();
+
         // 2. Créer 1000 clients
         $this->command->info('Création des clients...');
         Client::factory()->count(1000)->create([
@@ -42,8 +44,7 @@ class DatabaseSeeder extends Seeder
         $navires = Navire::factory()->count(500)->create();
 
         $this->command->info('Génération de 20 000 factures avec logique métier stricte...');
-
-        // Boucle par lots de 500
+        // Boucle par lots pour la performance
         for ($i = 0; $i < 40; $i++) {
             Facture::factory()
                 ->count(500)
@@ -51,68 +52,81 @@ class DatabaseSeeder extends Seeder
                     'client_id' => fn() => $clientIds->random(),
                     'navire_id' => fn() => $navires->random()->id,
                     'created_by' => $admin->id,
-                    // On initialise tout à "brouillon" pour le modifier dans le each()
+                    'total_ht' => 0,  // On initialise à 0 pour calculer après
+                    'total_tva' => 0,
+                    'total_ttc' => 0,
                     'annuler' => false,
-                    'imprimer' => false,
-                    'montant_paye' => 0,
                 ])
                 ->each(function ($facture) use ($admin) {
-                    
-                    // --- ETAPE 1 : PRESTATIONS (Toujours présentes) ---
-                    Prestation::factory()->count(3)->create([
+
+                    // --- ETAPE 1 : CRÉATION DES PRESTATIONS RÉELLES ---
+                    // On crée entre 2 et 5 prestations par facture
+                    $nbPrestations = rand(2, 5);
+                    $sommeHT = 0;
+
+                    $prestations = Prestation::factory()->count($nbPrestations)->create([
                         'facture_id' => $facture->id,
-                        'total_ht' => $facture->total_ht / 3
                     ]);
 
-                    // --- ETAPE 2 : LOGIQUE METIER (Annulation vs Paiement) ---
-                    
-                    // On décide du sort de la facture : 10% de chance d'être annulée
+                    // Calcul de la somme réelle des prestations créées
+                    $sommeHT = $prestations->sum('total_ht');
+
+                    // --- ETAPE 2 : CALCULS FINANCIERS (Stricts) ---
+                    $tauxTVA = 0.19; // 19%
+                    $montantTVA = $sommeHT * $tauxTVA;
+                    $totalTTC = $sommeHT + $montantTVA;
+
+                    // --- ETAPE 3 : MISE À JOUR DE LA FACTURE ---
                     $estAnnulee = rand(1, 100) <= 10;
 
                     if ($estAnnulee) {
-                        // CAS 1 : FACTURE ANNULÉE
                         $facture->update([
+                            'total_ht' => $sommeHT,
+                            'total_tva' => $montantTVA,
+                            'total_ttc' => $totalTTC,
                             'annuler' => true,
-                            'imprimer' => false, // Impossible d'imprimer une annulée
-                            'motif_annulation' => 'Erreur de saisie / Doublon',
+                            'motif_annulation' => 'Erreur de saisie',
                             'date_annulation' => now(),
                             'annule_par' => $admin->id,
-                            'reste_a_payer' => $facture->total_ttc, // La dette reste affichée techniquement, mais exclue par les requêtes
-                            'montant_paye' => 0 
+                            'montant_paye' => 0,
+                            'reste_a_payer' => $totalTTC
                         ]);
-                        // STOP ICI : Pas de paiement pour les annulées
-
                     } else {
-                        // CAS 2 : FACTURE VALIDE (ET IMPRIMÉE)
+                        // Facture Valide
                         $facture->update([
-                            'annuler' => false,
-                            'imprimer' => true, // La facture est validée
+                            'total_ht' => $sommeHT,
+                            'total_tva' => $montantTVA,
+                            'total_ttc' => $totalTTC,
+                            'imprimer' => true,
                             'date_impression' => now()->subDays(rand(1, 30)),
-                            'imprime_par' => $admin->id,
                         ]);
 
-                        // Gestion des paiements (Seulement si non annulée)
-                        // 60% de chance d'être payée (totalement ou partiellement)
+                        // --- ETAPE 4 : GESTION DES PAIEMENTS COHÉRENTS ---
                         if (rand(1, 100) <= 60) {
-                            $montantAPayer = $facture->total_ttc * (rand(50, 100) / 100);
+                            // On paye soit tout, soit une partie
+                            $pourcentagePaye = rand(50, 100) / 100;
+                            $montantAPayer = round($totalTTC * $pourcentagePaye, 2);
 
                             Paiement::factory()->create([
                                 'facture_id' => $facture->id,
                                 'montant' => $montantAPayer,
-                                'date_paiement' => now(),
                                 'created_by' => $admin->id,
-                                'mode_paiement' => rand(1, 2) // Chèque ou Virement
                             ]);
 
                             $facture->update([
                                 'montant_paye' => $montantAPayer,
-                                'reste_a_payer' => $facture->total_ttc - $montantAPayer
+                                'reste_a_payer' => $totalTTC - $montantAPayer
+                            ]);
+                        } else {
+                            $facture->update([
+                                'montant_paye' => 0,
+                                'reste_a_payer' => $totalTTC
                             ]);
                         }
                     }
                 });
 
-            $this->command->info("Progrès : " . (($i + 1) * 500) . " / 20 000 factures traitées.");
+            $this->command->info("Progrès : " . (($i + 1) * 500) . " / 20 000 factures.");
         }
     }
 }

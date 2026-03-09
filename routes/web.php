@@ -17,25 +17,25 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware('role:admin')->group(function () {
         Route::get('/admin/dashboard', [DashboardController::class, 'index'])
             ->name('admin.dashboard');
-        Route::get('/factures', [FactureController::class, 'index'])->name('admin.factures.index');
-        Route::get('/factures/{facture}', [FactureController::class, 'show'])->name('admin.factures.show');
-        Route::get('/factures/{facture}/print', [FactureController::class, 'print'])->name('admin.factures.print');
+        Route::get('/admin/factures', [FactureController::class, 'index'])->name('admin.factures.index');
+        Route::get('/admin/factures/{facture}', [FactureController::class, 'show'])->name('admin.factures.show');
+        Route::get('/admin/factures/{facture}/print', [FactureController::class, 'print'])->name('admin.factures.print');
 
         // MODULE IMPORTATION EXCEL
-        Route::get('/imports', [ImportController::class, 'index'])->name('admin.imports.index');
+        Route::get('/admin/imports', [ImportController::class, 'index'])->name('admin.imports.index');
         // import factures and paiements separately
-        Route::get('/paiements', [PaiementController::class, 'index'])->name('admin.paiements.index');
+        Route::get('/admin/paiements', [PaiementController::class, 'index'])->name('admin.paiements.index');
 
-        Route::get('/imports/template/factures', [ImportController::class, 'templateFactures'])->name('admin.imports.template.factures');
-        Route::post('/imports/factures', [ImportController::class, 'storeFactures'])->name('admin.imports.factures');
-        Route::get('/imports/template/paiements', [ImportController::class, 'templatePaiements'])->name('admin.imports.template.paiements');
-        Route::post('/imports/paiements', [ImportController::class, 'storePaiements'])->name('admin.imports.paiements');
+        Route::get('/admin/imports/template/factures', [ImportController::class, 'templateFactures'])->name('admin.imports.template.factures');
+        Route::post('/admin/imports/factures', [ImportController::class, 'storeFactures'])->name('admin.imports.factures');
+        Route::get('/admin/imports/template/paiements', [ImportController::class, 'templatePaiements'])->name('admin.imports.template.paiements');
+        Route::post('/admin/imports/paiements', [ImportController::class, 'storePaiements'])->name('admin.imports.paiements');
         // legacy/temp endpoints left for compatibility
-        Route::post('/imports/upload-temp', [ImportController::class, 'uploadTemp'])->name('admin.imports.upload-temp');
-        Route::post('/imports/store', [ImportController::class, 'storeFactures']); // alias to factures
+        Route::post('/admin/imports/upload-temp', [ImportController::class, 'uploadTemp'])->name('admin.imports.upload-temp');
+        Route::post('/admin/imports/store', [ImportController::class, 'storeFactures']); // alias to factures
 
         // GESTION DES CLIENTS
-        Route::resource('clients', ClientController::class, ['as' => 'admin']);
+        Route::resource('/admin/clients', ClientController::class, ['as' => 'admin']);
     });
 
     Route::middleware('role:client')->group(function () {
@@ -47,7 +47,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('client.factures.index');
         Route::get('/client/factures/{facture}', [\App\Http\Controllers\Client\FactureController::class, 'show'])
             ->name('client.factures.show');
-        Route::get('/factures/{facture}/print', [FactureController::class, 'print'])->name('client.factures.print');
+        Route::get('/factures/{facture}/print', [FactureController::class, 'print'])->name('client.invoices.facture.print');
 
         Route::get('/client/paiements', [\App\Http\Controllers\Client\PaiementController::class, 'index'])
             ->name('client.paiements.index');
