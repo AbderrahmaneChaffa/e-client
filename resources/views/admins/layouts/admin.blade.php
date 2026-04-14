@@ -35,7 +35,7 @@
             :class="sidebarOpen ? 'w-64' : 'w-20'">
 
             <div class="h-20 flex items-center px-4 border-b border-slate-800 overflow-hidden">
-                <img src="{{ asset('storage/Logo/petit taille.png') }}" class="h-10 w-10 min-w-[40px] object-contain">
+                <img src="{{ asset('storage/Logo/logo_epo.png') }}" class="h-10 w-10 min-w-[40px] object-contain">
                 <span x-show="sidebarOpen" x-transition.opacity class="ml-3 font-bold text-xl tracking-tight whitespace-nowrap">
                     E-Client <span class="text-indigo-400">EPO</span>
                 </span>
