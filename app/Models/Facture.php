@@ -24,7 +24,15 @@ class Facture extends Model
         'total_tva',
         'total_ttc',
         'montant_paye',
-        'reste_a_payer'
+        'reste_a_payer',
+        'bordereau',      // Ajouté
+        'description',    // Ajouté
+        'pour',           // Ajouté
+        'devise',         // Ajouté
+        'taux_devise',    // Ajouté
+        'mode_paiement',  // Ajouté
+        'annuler',        // Ajouté
+        'created_by',     // Ajouté
     ];
 
     // Dates automatiques

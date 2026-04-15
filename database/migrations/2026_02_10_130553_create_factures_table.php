@@ -30,7 +30,7 @@ return new class extends Migration
             $table->string('pour')->nullable()->comment('Client Final / Beneficiaire');
             
             // Devises
-            $table->enum('devise', ['DA', 'USD', 'EUR'])->default('DA');
+            $table->enum('devise', ['DA', 'DR', 'EUR'])->default('DA');
             // CORRECTION : Precision de 4 chiffres après la virgule pour les taux (ex: 1.0856)
             $table->decimal('taux_devise', 10, 4)->default(1)->comment('Taux de conversion par rapport au DA');
 

@@ -23,6 +23,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         // MODULE IMPORTATION EXCEL
         Route::get('/admin/imports', [ImportController::class, 'index'])->name('admin.imports.index');
+        Route::prefix('admin/imports')->name('admin.imports.')->group(function () {
+            Route::get('/',                      [ImportController::class, 'index'])->name('index');
+            Route::post('/',                     [ImportController::class, 'store'])->name('store');
+            Route::get('/{batch}/progress',      [ImportController::class, 'progress'])->name('progress');
+        });
+
         // import factures and paiements separately
         Route::get('/admin/paiements', [PaiementController::class, 'index'])->name('admin.paiements.index');
 

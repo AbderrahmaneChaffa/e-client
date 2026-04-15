@@ -11,7 +11,7 @@ class Client extends Model
 {
     use HasFactory, Notifiable;
 
-    protected $fillable = ['code', 'name', 'nis', 'rc', 'ai'];
+    protected $fillable = ['code_client', 'name', 'nis', 'rc', 'ai'];
 
     // Un client peut avoir plusieurs comptes utilisateurs (employés)
     public function users(): HasMany

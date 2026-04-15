@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Maatwebsite\Excel\Imports\HeadingRowFormatter;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -19,6 +20,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // Désactive la mise en minuscule automatique des en-têtes Excel
+        // pour que 'FACTURE', 'CODE_CLIENT', etc. soient lus tels quels.
+        HeadingRowFormatter::default('none');
     }
 }
