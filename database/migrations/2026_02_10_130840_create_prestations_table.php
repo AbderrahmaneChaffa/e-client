@@ -18,9 +18,9 @@ return new class extends Migration
             $table->string('libelle');
             $table->integer('quantite');
             $table->decimal('prix_unitaire', 15, 2);
-            $table->decimal('taux_ht', 5, 2)->default(0);
+            $table->decimal('taux_ht', 15, 2)->default(0);
             $table->decimal('total_ht', 15, 2)->default(0);
-            $table->decimal('taux_tva', 5, 2)->default(0);
+            $table->decimal('taux_tva', 15, 2)->default(0);
             $table->decimal('total_tva', 15, 2)->default(0);
             $table->decimal('total_ttc', 15, 2)->default(0);
              // Relations

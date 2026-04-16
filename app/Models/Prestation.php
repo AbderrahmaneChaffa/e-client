@@ -12,11 +12,16 @@ class Prestation extends Model
 
     protected $fillable = [
         'facture_id',
-        'code_produit',
-        'designation',
+        'article',
+        'libelle',
         'quantite',
         'prix_unitaire',
-        'total_ht'
+        'total_ht',
+        'taux_ht',
+        'taux_tva',
+        'total_tva',
+        'total_ttc'
+
     ];
 
     public function facture()

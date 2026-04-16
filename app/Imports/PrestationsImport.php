@@ -41,7 +41,7 @@ class PrestationsImport implements ToModel, WithHeadingRow, WithChunkReading, Sk
         }
 
         // La facture DOIT exister (l'import factures doit être fait avant)
-        $facture = Facture::where('numero', $factureNumero)->first();
+        $facture = Facture::where('numero_facture', $factureNumero)->first();
         if (!$facture) {
             $this->batch->increment('failed_rows');
             return null;
@@ -55,7 +55,7 @@ class PrestationsImport implements ToModel, WithHeadingRow, WithChunkReading, Sk
             [
                 'libelle'    => trim($row['libelle'] ?? ''),
                 'quantite'   => $this->parseAmount($row['quantite'] ?? '0'),
-                'prix'       => $this->parseAmount($row['prix'] ?? '0'),
+                'prix_unitaire'       => $this->parseAmount($row['prix'] ?? '0'),
                 'taux_ht'    => $this->parseAmount($row['taux_ht'] ?? '0'),
                 'total_ht'   => $this->parseAmount($row['total_ht'] ?? '0'),
                 'total_tva'  => $this->parseAmount($row['total_tva'] ?? '0'),
