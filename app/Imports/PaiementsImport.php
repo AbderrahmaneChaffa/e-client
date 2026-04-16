@@ -39,7 +39,7 @@ class PaiementsImport implements ToModel, WithHeadingRow, WithChunkReading, Skip
             $this->batch->increment('processed_rows', 200);
         }
 
-        $facture = Facture::where('numero', $factureNumero)->first();
+        $facture = Facture::where('numero_facture', $factureNumero)->first();
         if (!$facture) {
             $this->batch->increment('failed_rows');
             return null;
