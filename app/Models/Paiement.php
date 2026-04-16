@@ -12,11 +12,15 @@ class Paiement extends Model
 
     protected $fillable = [
         'facture_id',
+        'recu',
         'date_paiement',
-        'reference_recu',
+        'montant',
+        'mode_paiement',
         'numero_cheque',
         'banque',
-        'montant_verse'
+        'image_recu',
+        'facture_anterieur',
+        'note','created_by',
     ];
 
     public function facture()

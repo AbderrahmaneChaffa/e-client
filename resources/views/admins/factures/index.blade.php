@@ -60,6 +60,7 @@
                             <option value="">Tous les statuts</option>
                             <option value="paye" {{ request('statut') == 'paye' ? 'selected' : '' }}>Payées</option>
                             <option value="impaye" {{ request('statut') == 'impaye' ? 'selected' : '' }}>Impayées</option>
+                            <option value="annulee" {{ request('statut') == 'annulee' ? 'selected' : '' }}>Annulées</option>
                         </select>
                     </div>
 

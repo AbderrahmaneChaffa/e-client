@@ -33,7 +33,8 @@ return new class extends Migration
 
             // Traçabilité
             $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
-
+            // Un reçu ne peut régler une facture donnée qu'une seule fois
+            $table->unique(['facture_id', 'recu'], 'uq_paiement_facture_recu');
             $table->timestamps();
             $table->softDeletes();
         });

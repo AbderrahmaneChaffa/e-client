@@ -25,7 +25,7 @@ class ProcessImportJob implements ShouldQueue
         $batch = ImportBatch::findOrFail($this->batchId);
 
         try {
-            // ── Passe 1 : comptage des lignes (sans charger en mémoire) ──────
+            // ── Passe 1 : comptage ───────────────────────────────────────────
             $counter = new RowCountImport();
             Excel::import($counter, storage_path("app/private/{$batch->stored_path}"));
 
@@ -45,17 +45,23 @@ class ProcessImportJob implements ShouldQueue
 
             Excel::import($import, storage_path("app/private/{$batch->stored_path}"));
 
-            // ── Flush final du compteur ──────────────────────────────────────
+            // ── Log groupé des factures manquantes (paiements uniquement) ────
+            // Évite 18 000 appels à batch->increment('failed_rows') pendant l'import
+            if ($import instanceof PaiementsImport) {
+                $import->logMissingFactures();
+            }
+
+            // ── Flush final ──────────────────────────────────────────────────
             $finalCount = (int) Cache::get("import_batch_{$batch->id}", 0);
+
             $batch->update([
-                'status'          => 'completed',
-                'processed_rows'  => $finalCount,
-                'completed_at'    => now(),
+                'status'         => 'completed',
+                'processed_rows' => $finalCount,
+                'completed_at'   => now(),
             ]);
         } catch (\Throwable $e) {
             Log::error("Import EPO échoué [batch #{$batch->id}]", [
                 'message' => $e->getMessage(),
-                'trace'   => $e->getTraceAsString(),
             ]);
 
             $batch->update([

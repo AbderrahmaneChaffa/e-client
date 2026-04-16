@@ -66,6 +66,6 @@ class PrestationsImport implements ToModel, WithHeadingRow, WithChunkReading, Sk
 
     public function chunkSize(): int
     {
-        return 500;
+        return 5000;
     }
 }

@@ -138,7 +138,7 @@ class FacturesImport extends StringValueBinder implements
                 'devise'          => trim($row['DEVISE']      ?? 'DA'),
                 'taux_devise'     => $this->parseAmount($row['TAUX_DEVISE'] ?? '1'),
                 'mode_paiement'   => trim($row['PAIEMENT']    ?? ''),
-                'annuler'         => $annule ? 1 : 0,
+                'annuler'         => $annule,
                 'created_by'      => Auth::id(),
             ]
         );
@@ -146,7 +146,7 @@ class FacturesImport extends StringValueBinder implements
 
     public function chunkSize(): int
     {
-        return 500;
+        return 5000;
     }
 
     public function getLocalCount(): int
