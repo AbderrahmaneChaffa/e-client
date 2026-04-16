@@ -22,8 +22,8 @@ return new class extends Migration
 
             // Dates et Heures
           //  $table->dateTime('eta')->nullable(); // Arrivée prévue
-            $table->dateTime('date_arrivee')->nullable(); // Arrivée réelle
-            $table->dateTime('date_sortie')->nullable(); // Départ réel
+            $table->date('date_arrivee')->nullable(); // Arrivée réelle
+            $table->date('date_sortie')->nullable(); // Départ réel
 
             // Opérations
             $table->string('poste_quai')->nullable();

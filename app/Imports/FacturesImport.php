@@ -4,7 +4,7 @@
 namespace App\Imports;
 
 use App\Imports\Concerns\ParsesExcelData;
-use App\Models\{Client, Facture, ImportBatch, Navire};
+use App\Models\{Client, Escale, Facture, ImportBatch, Navire};
 use Illuminate\Support\Facades\{Auth, Cache};
 use Maatwebsite\Excel\Concerns\{
     Importable,
@@ -82,31 +82,35 @@ class FacturesImport extends StringValueBinder implements
             }
             $client = $this->clientCache[$codeClient];
         }
-
-        // ── Navire (avec cache local) ────────────────────────────────────────
-        // Note : les dates ENTREE/SORTIE appartiennent à la Facture,
-        // pas au Navire. Le Navire n'est identifié que par son nom + pavillon.
-        $navire    = null;
-        $navireNom = trim($row['NAVIRE'] ?? '');
-
-        // ── Dates (parseDate() retourne null si vide ou invalide) ───────────
-        // ENTREE et SORTIE peuvent être vides dans l'ERP → on ne crash pas
         $dateFacture = $this->parseDate($row['DATE']   ?? '');
-        $dateEntree  = $this->parseDate($row['ENTREE'] ?? '');
-        $dateSortie  = $this->parseDate($row['SORTIE'] ?? '');
-        if (!empty($navireNom)) {
-            if (!isset($this->navireCache[$navireNom])) {
-                $this->navireCache[$navireNom] = Navire::firstOrCreate(
-                    ['nom'      => $navireNom],
-                    ['pavillon' => trim($row['PAVILLON'] ?? ''),
-                        'date_arrivee' => $dateEntree,
-                        'date_sortie' => $dateSortie,
-                    ]
-                );
-            }
-            $navire = $this->navireCache[$navireNom];
-        }
+        // ── 1. Navire ──────────────────────────────────────────────────────
+        $navireNom = trim($row['NAVIRE'] ?? 'NAVIRE INCONNU');
+        $pavillon = trim($row['PAVILLON'] ?? 'INCONNU');
 
+        // Laravel va chercher un navire qui a EXACTEMENT ce nom ET ce pavillon.
+        // S'il ne trouve pas le duo (ex: ALMARIYA + CHYPRE), il crée une nouvelle ligne.
+        $navire = Navire::firstOrCreate([
+            'nom'      => $navireNom,
+            'pavillon' => $pavillon,
+        ]);
+
+        // ── 2. Escale ──────────────────────────────────────────────────────
+        $escale = null;
+        // $dateEntree =;
+
+        // if (!empty($dateEntree)) {
+            // L'escale sera liée à l'ID spécifique du navire (celui avec le bon pavillon)
+        $escale = Escale::firstOrCreate(
+                [
+                    'navire_id'    => $navire->id,
+                ],
+                [
+                    'date_arrivee' =>  $this->parseDate($row['ENTREE'] ?? ''),
+                    'date_sortie'  => $this->parseDate($row['SORTIE'] ?? ''),
+                    
+                ]
+            );
+        // }
 
         // ── Montants ────────────────────────────────────────────────────────
         $totalHt  = $this->parseAmount($row['TOTAL_HT']  ?? '0');
@@ -122,11 +126,8 @@ class FacturesImport extends StringValueBinder implements
             ['numero_facture' => $numero],
             [
                 'client_id'       => $client?->id,
-                'navire_id'       => $navire?->id,
+                'escale_id'       => $escale?->id,
                 'date_facture'    => $dateFacture,
-                // Si votre migration a ces colonnes sur la table factures :
-                // 'date_entree'  => $dateEntree,
-                // 'date_sortie'  => $dateSortie,
                 'bordereau'       => trim($row['BORDEREAU']   ?? ''),
                 'description'     => trim($row['DESCRIPTION'] ?? ''),
                 'pour'            => trim($row['POUR']        ?? ''),

@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('factures', function (Blueprint $table) {
             $table->id();
-            
+
             // Identification
             $table->string('numero_facture')->unique()->index();
             $table->date('date_facture');
@@ -22,13 +22,13 @@ return new class extends Migration
 
             // Infos Paiement
             // CORRECTION : tinyInteger est mieux pour 1, 2, 3... decimal(2,2) ne marche pas pour ça.
-            $table->tinyInteger('mode_paiement')->default(1)->comment('1: Virement, 2: Chèque, 3: Espèce'); 
+            $table->tinyInteger('mode_paiement')->default(1)->comment('1: Virement, 2: Chèque, 3: Espèce');
             $table->string('bordereau')->nullable();
-            
+
             // Détails
             $table->text('description')->nullable(); // 'text' est mieux que 'string' pour les descriptions longues
             $table->string('pour')->nullable()->comment('Client Final / Beneficiaire');
-            
+
             // Devises
             $table->enum('devise', ['DA', 'DR', 'EUR'])->default('DA');
             // CORRECTION : Precision de 4 chiffres après la virgule pour les taux (ex: 1.0856)
@@ -47,12 +47,12 @@ return new class extends Migration
 
             // Relations
             // CORRECTION : Il faut nullable() pour que 'set null' fonctionne
-            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete(); 
-            
-            // SECURITE COMPTABLE : On ne supprime pas les factures en cascade ! On empêche la suppression du client tant qu'il a des factures (restrict)
-            $table->foreignId('client_id')->constrained()->restrictOnDelete(); 
-            $table->foreignId('navire_id')->nullable()->constrained()->nullOnDelete();
+            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
 
+            // SECURITE COMPTABLE : On ne supprime pas les factures en cascade ! On empêche la suppression du client tant qu'il a des factures (restrict)
+            $table->foreignId('client_id')->constrained()->restrictOnDelete();
+            // On pointe vers l'ESCALE et non plus le NAVIRE directement
+            $table->foreignId('escale_id')->nullable()->constrained('escales')->nullOnDelete();
             // Montants (Precision 15, 2 classique pour la finance)
             $table->decimal('total_ht', 15, 2)->default(0);
             $table->decimal('total_tva', 15, 2)->default(0);
@@ -63,8 +63,8 @@ return new class extends Migration
             $table->decimal('reste_a_payer', 15, 2)->default(0);
 
             // Index pour performance
-            $table->index(['client_id', 'reste_a_payer']); 
-            
+            $table->index(['client_id', 'reste_a_payer']);
+
             $table->timestamps();
             $table->softDeletes(); // Ajout vital pour la traçabilité (created_at, updated_at, deleted_at)
         });

@@ -423,11 +423,11 @@
                 <div class="section-title">Informations Navire</div>
                 <div class="info-row">
                     <div class="info-label">Nom du Navire :</div>
-                    <div class="info-value">{{ $facture->navire->nom ?? 'N/A' }}</div>
+                    <div class="info-value">{{ $facture->escale->navire->nom ?? 'N/A' }}</div>
                 </div>
                 <div class="info-row">
                     <div class="info-label">Pavillon :</div>
-                    <div class="info-value">{{ $facture->navire->pavillon ?? 'N/A' }}</div>
+                    <div class="info-value">{{ $facture->escale->navire->pavillon ?? 'N/A' }}</div>
                 </div>
                 <div class="info-row">
                     <div class="info-label">N° Bordereau :</div>
@@ -435,11 +435,11 @@
                 </div>
                 <div class="info-row">
                     <div class="info-label">Entrée au port :</div>
-                    <div class="info-value">{{ $facture->navire->date_arrivee ? \Carbon\Carbon::parse($facture->navire->date_arrivee)->format('d/m/Y') : 'N/A' }}</div>
+                    <div class="info-value">{{ $facture->escale->date_arrivee ? \Carbon\Carbon::parse($facture->escale->date_arrivee)->format('d/m/Y') : 'N/A' }}</div>
                 </div>
                 <div class="info-row">
                     <div class="info-label">Sortie du port :</div>
-                    <div class="info-value">{{ $facture->navire->date_sortie ? \Carbon\Carbon::parse($facture->navire->date_sortie)->format('d/m/Y') : 'N/A' }}</div>
+                    <div class="info-value">{{ $facture->escale->date_sortie ? \Carbon\Carbon::parse($facture->escale->date_sortie)->format('d/m/Y') : 'N/A' }}</div>
                 </div>
             </div>
 

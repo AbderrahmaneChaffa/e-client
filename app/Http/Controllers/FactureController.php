@@ -17,7 +17,7 @@ class FactureController extends Controller
     public function index(Request $request)
     {
         // 1. Query de base avec relations pour éviter 20 000 requêtes SQLhhh
-        $query = Facture::with(['client', 'navire']);
+        $query = Facture::with(['client', 'escale']);
 
         // 2. Filtre par numéro de facture
         if ($request->filled('numero')) {
@@ -51,7 +51,7 @@ class FactureController extends Controller
             return redirect()->back()->with('error', 'Impossible d\'imprimer une facture annulée.');
         }
 
-        $facture->load(['client', 'navire', 'prestations', 'paiements']);
+        $facture->load(['client', 'escale', 'prestations', 'paiements']);
 
         if (!$facture->imprimer) {
             $facture->update([
@@ -101,7 +101,7 @@ class FactureController extends Controller
     public function show(Facture $facture)
     {
         // On charge tout ce qui est lié à cette facture spécifique
-        $facture->load(['client', 'navire', 'prestations', 'paiements']);
+        $facture->load(['client', 'escale', 'prestations', 'paiements']);
 
         return view('admins.factures.show', compact('facture'));
     }

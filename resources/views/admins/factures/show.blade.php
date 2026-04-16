@@ -30,8 +30,8 @@
             </div>
             <div>
                 <h3 class="text-xs uppercase font-bold text-gray-400 mb-2">Détails Navire</h3>
-                <p class="font-bold text-gray-800">{{ $facture->navire->nom ?? 'N/A' }}</p>
-                <p class="text-sm text-gray-600">Pavillon: {{ $facture->navire->pavillon ?? '-' }}</p>
+                <p class="font-bold text-gray-800">{{ $facture->escale->navire->nom ?? 'N/A' }}</p>
+                <p class="text-sm text-gray-600">Pavillon: {{ $facture->escale->navire->pavillon ?? '-' }}</p>
             </div>
             <div class="bg-white p-4 rounded-lg border border-gray-100 shadow-sm text-right">
                 <h3 class="text-xs uppercase font-bold text-gray-400 mb-1">Reste à payer</h3>

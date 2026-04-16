@@ -19,7 +19,7 @@ class Facture extends Model
         'date_mise_en_ligne',
         'date_echeance',
         'client_id',
-        'navire_id',
+        'escale_id',
         'total_ht',
         'total_tva',
         'total_ttc',
@@ -62,8 +62,12 @@ class Facture extends Model
         return $this->hasMany(Paiement::class);
     }
 
-    public function navire(): BelongsTo
+    // public function navire(): BelongsTo
+    // {
+    //     return $this->belongsTo(Navire::class);
+    // }
+    public function escale(): BelongsTo
     {
-        return $this->belongsTo(Navire::class);
+        return $this->belongsTo(Escale::class);
     }
 }

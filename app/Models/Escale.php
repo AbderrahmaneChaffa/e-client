@@ -27,8 +27,8 @@ class Escale extends Model
     // Conversion automatique des dates pour pouvoir utiliser Carbon dessus
     protected $casts = [
         // 'eta' => 'datetime',
-        'date_arrivee' => 'datetime',
-        'date_sortie' => 'datetime',
+        'date_arrivee' => 'date',
+        'date_sortie' => 'date',
 
     ];
 
