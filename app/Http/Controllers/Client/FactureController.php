@@ -12,7 +12,7 @@ class FactureController extends Controller
     public function index(Request $request)
     {
         $clientId = Auth::user()->client_id;
-        $query = Facture::where('client_id', $clientId)->with('navire');
+        $query = Facture::where('client_id', $clientId)->with('escale'); // Eager loading de l'escale pour éviter les N+1
 
         if ($request->filled('numero')) {
             $query->where('numero_facture', 'like', '%' . $request->numero . '%');
@@ -34,7 +34,7 @@ class FactureController extends Controller
     public function show(Facture $facture)
     {
         $this->authorizeFacture($facture);
-        $facture->load(['navire', 'prestations', 'paiements']);
+        $facture->load(['escale.navire', 'prestations', 'paiements']);
         return view('clients.factures.show', compact('facture'));
     }
 

@@ -18,7 +18,7 @@ class PaiementController extends Controller
             });
 
         if ($request->filled('search')) {
-            $query->where('reference_recu', 'like', '%' . $request->search . '%')
+            $query->where('recu', 'like', '%' . $request->search . '%')
                   ->orWhere('numero_cheque', 'like', '%' . $request->search . '%');
         }
 

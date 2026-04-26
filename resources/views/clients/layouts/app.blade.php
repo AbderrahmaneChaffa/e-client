@@ -296,7 +296,7 @@
     <div class="sidebar" id="sidebar">
         <div style="padding: 24px; border-bottom: 1px solid #334155;">
             <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 8px;">
-                <img src="{{ asset('storage/Logo/petit taille.png') }}" alt="Logo" style="height: 32px; width: auto;">
+                <img src="{{ asset('storage/Logo/logo_epo.png') }}" alt="Logo" style="height: 32px; width: auto;">
                 <h1 style="color: white; font-size: 18px; font-weight: bold; margin: 0;">E-Client</h1>
             </div>
             <p style="color: #94a3b8; font-size: 12px; margin: 4px 0 0 0; text-align: center;">Portail Client</p>

@@ -28,8 +28,8 @@ class DashboardController extends Controller
             ')
             ->first();
 
-        // 2. Factures récentes avec relations (Navire par exemple)
-        $recentInvoices = Facture::with('navire') // Eager loading
+        // 2. Factures récentes avec relations (Escale par exemple)
+        $recentInvoices = Facture::with('escale') // Eager loading
             ->where('client_id', $clientId)
             ->where('annuler', false)
             ->orderBy('date_facture', 'desc')

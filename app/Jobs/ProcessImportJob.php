@@ -1,5 +1,5 @@
 <?php
-
+// app/Jobs/ProcessImportJob.php
 namespace App\Jobs;
 
 use App\Imports\{FacturesImport, PaiementsImport, PrestationsImport, RowCountImport};
@@ -15,8 +15,8 @@ class ProcessImportJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $timeout = 7200;  // 2 heures max
-    public int $tries   = 1;     // Pas de retry automatique sur un import partiel
+    public int $timeout = 7200;
+    public int $tries   = 1;
 
     public function __construct(private readonly int $batchId) {}
 
@@ -24,8 +24,13 @@ class ProcessImportJob implements ShouldQueue
     {
         $batch = ImportBatch::findOrFail($this->batchId);
 
+        // Si le batch précédent (dans la chaîne) a échoué, on abandonne
+        if ($batch->status === 'failed') {
+            return;
+        }
+
         try {
-            // ── Passe 1 : comptage ───────────────────────────────────────────
+            // ── Passe 1 : comptage léger ─────────────────────────────────
             $counter = new RowCountImport();
             Excel::import($counter, storage_path("app/private/{$batch->stored_path}"));
 
@@ -35,33 +40,44 @@ class ProcessImportJob implements ShouldQueue
                 'started_at' => now(),
             ]);
 
-            // ── Passe 2 : import réel ────────────────────────────────────────
+            // ── Passe 2 : import réel ────────────────────────────────────
             $import = match ($batch->type) {
                 'factures'    => new FacturesImport($batch),
                 'prestations' => new PrestationsImport($batch),
                 'paiements'   => new PaiementsImport($batch),
-                default       => throw new \InvalidArgumentException("Type inconnu : {$batch->type}"),
+                default       => throw new \InvalidArgumentException(
+                    "Type d'import inconnu : {$batch->type}"
+                ),
             };
 
             Excel::import($import, storage_path("app/private/{$batch->stored_path}"));
 
-            // ── Log groupé des factures manquantes (paiements uniquement) ────
-            // Évite 18 000 appels à batch->increment('failed_rows') pendant l'import
-            if ($import instanceof PaiementsImport) {
+            // ── Log groupé des lignes ignorées (paiements) ───────────────
+            if (method_exists($import, 'logMissingFactures')) {
                 $import->logMissingFactures();
             }
 
-            // ── Flush final ──────────────────────────────────────────────────
-            $finalCount = (int) Cache::get("import_batch_{$batch->id}", 0);
+            // ── Flush final du compteur cache ────────────────────────────
+            $finalProcessed = (int) Cache::get("import_batch_{$batch->id}", 0);
+
+            // Reste non flushé (localCount % FLUSH_EVERY)
+            $remainder = $finalProcessed - $batch->processed_rows;
 
             $batch->update([
                 'status'         => 'completed',
-                'processed_rows' => $finalCount,
+                'processed_rows' => $finalProcessed,
+                // On n'écrase pas failed_rows si logMissingFactures l'a déjà incrémenté
                 'completed_at'   => now(),
             ]);
+
+            // Nettoyage du fichier temporaire après succès
+            // (optionnel — à activer en production)
+            // Storage::disk('local')->delete($batch->stored_path);
+
         } catch (\Throwable $e) {
-            Log::error("Import EPO échoué [batch #{$batch->id}]", [
+            Log::error("Import EPO échoué [batch #{$batch->id} – {$batch->type}]", [
                 'message' => $e->getMessage(),
+                'file'    => $e->getFile() . ':' . $e->getLine(),
             ]);
 
             $batch->update([
@@ -70,6 +86,8 @@ class ProcessImportJob implements ShouldQueue
                 'completed_at'  => now(),
             ]);
 
+            // On relance l'exception pour interrompre la chaîne Bus::chain
+            // → les jobs suivants (prestations, paiements) ne s'exécuteront pas
             throw $e;
         } finally {
             Cache::forget("import_batch_{$batch->id}");
@@ -79,8 +97,9 @@ class ProcessImportJob implements ShouldQueue
     public function failed(\Throwable $e): void
     {
         ImportBatch::where('id', $this->batchId)->update([
-            'status'       => 'failed',
-            'completed_at' => now(),
+            'status'        => 'failed',
+            'completed_at'  => now(),
+            'error_summary' => ['message' => $e->getMessage()],
         ]);
     }
 }

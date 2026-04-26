@@ -26,8 +26,8 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-8 p-6 bg-gray-50/50">
             <div>
                 <h3 class="text-xs uppercase font-bold text-gray-400 mb-2">Navire</h3>
-                <p class="font-bold text-gray-800">{{ $facture->navire->nom ?? 'N/A' }}</p>
-                <p class="text-sm text-gray-600">Pavillon: {{ $facture->navire->pavillon ?? '-' }}</p>
+                <p class="font-bold text-gray-800">{{ $facture->escale->navire->nom ?? 'N/A' }}</p>
+                <p class="text-sm text-gray-600">Pavillon: {{ $facture->escale->navire->pavillon ?? '-' }}</p>
             </div>
             <div class="bg-white p-4 rounded-lg border border-gray-100 shadow-sm text-right">
                 <h3 class="text-xs uppercase font-bold text-gray-400 mb-1">Reste à payer</h3>
