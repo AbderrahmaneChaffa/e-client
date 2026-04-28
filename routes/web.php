@@ -20,17 +20,27 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/admin/factures', [FactureController::class, 'index'])->name('admin.factures.index');
         Route::get('/admin/factures/{facture}', [FactureController::class, 'show'])->name('admin.factures.show');
         Route::get('/admin/factures/{facture}/print', [FactureController::class, 'print'])->name('admin.factures.print');
-
-        // MODULE IMPORTATION EXCEL
-        Route::get('/admin/imports', [ImportController::class, 'index'])->name('admin.imports.index');
-        Route::prefix('admin/imports')->name('admin.imports.')->group(function () {
-            Route::get('/',                      [ImportController::class, 'index'])->name('index');
-            Route::post('/',                     [ImportController::class, 'store'])->name('store');
-            Route::get('/{batch}/progress',      [ImportController::class, 'progress'])->name('progress');
-        });
-
-        // import factures and paiements separately
         Route::get('/admin/paiements', [PaiementController::class, 'index'])->name('admin.paiements.index');
+
+        // ── Imports ERP BIG ───────────────────────────────────────────────
+        Route::prefix('/admin/imports')->name('admin.imports.')->group(function () {
+
+            // Liste + formulaire upload
+            Route::get('/', [ImportController::class, 'index'])->name('index');
+
+            // Upload + dispatch de la chaîne de jobs
+            Route::post('/', [ImportController::class, 'store'])->name('store');
+
+            // Progression d'un batch (appelé par le polling Alpine.js)
+            Route::get('/{batch}/progress', [ImportController::class, 'progress'])
+                ->name('progress');
+
+            // Suppression d'un batch terminé/échoué
+            Route::delete('/{batch}', [ImportController::class, 'destroy'])
+                ->name('destroy');
+        });
+        // import factures and paiements separately
+
 
         Route::get('/admin/imports/template/factures', [ImportController::class, 'templateFactures'])->name('admin.imports.template.factures');
         Route::post('/admin/imports/factures', [ImportController::class, 'storeFactures'])->name('admin.imports.factures');

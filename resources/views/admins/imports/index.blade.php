@@ -2,403 +2,573 @@
 @extends('admins.layouts.admin')
 
 @section('content')
-    <div class="max-w-4xl mx-auto py-8 px-4" x-data="importUploader()" x-init="init()">
+    <div class="max-w-5xl mx-auto py-8 px-4" x-data="importUploader()" x-init="init()">
 
-        <h1 class="text-2xl font-medium text-gray-900 dark:text-white mb-6">
-            Import depuis l'ERP BIG
-        </h1>
+        {{-- ── En-tête ──────────────────────────────────────────────────────────── --}}
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Import ERP BIG</h1>
+            <p class="text-gray-500 dark:text-gray-400 mt-1 text-sm">
+                Importez vos exports Excel dans l'ordre correct. La chaîne s'exécute automatiquement en arrière-plan.
+            </p>
+        </div>
 
-        {{-- ── Formulaire multi-fichiers ──────────────────────────────────────── --}}
+        {{-- ── Bannière ordre d'exécution ─────────────────────────────────────────── --}}
+        <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800
+                                            rounded-xl p-4 mb-6 flex items-start gap-3">
+            <svg class="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div class="text-sm text-blue-800 dark:text-blue-200">
+                <strong>Ordre d'exécution garanti :</strong>
+                Factures
+                <span class="mx-1 text-blue-400">→</span> Prestations
+                <span class="mx-1 text-blue-400">→</span> Paiements
+                <span class="mx-1 text-blue-400">→</span> Factures Payées
+                <span class="mx-1 text-blue-400">→</span> Prestations Payées.
+                Chaque fichier est optionnel — seuls les fichiers déposés seront traités.
+            </div>
+        </div>
+
+        {{-- ── Zones de dépôt ──────────────────────────────────────────────────────── --}}
         <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 mb-6">
 
-            <p class="text-sm text-gray-500 dark:text-gray-400 mb-5">
-                Déposez un ou plusieurs fichiers. L'import s'exécute toujours dans l'ordre
-                <strong class="text-gray-700 dark:text-gray-200">Factures → Prestations → Paiements</strong>.
-            </p>
+            {{-- Ligne 1 : 3 zones --}}
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
 
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
+                {{-- Factures --}}
+                {{-- <x-import-drop-zone ref="fileFactures" model="factures" label="Factures" color="amber"
+                    icon="document" />
 
-                {{-- Zone Factures --}}
-                <div class="relative flex flex-col items-center justify-center gap-2 p-4
-                                                                    border-2 border-dashed rounded-xl cursor-pointer transition-colors
-                                                                    border-amber-300 dark:border-amber-700
-                                                                    hover:bg-amber-50 dark:hover:bg-amber-900/20"
-                    @click="$refs.fileFactures.click()" :class="files.factures ? 'bg-amber-50 dark:bg-amber-900/20' : ''">
+                @php
+                $zones = [
+                [
+                'ref' => 'fileFactures',
+                'model' => 'factures',
+                'label' => 'Factures',
+                'color' => 'amber',
+                'icon' => 'document',
+                ],
+                [
+                'ref' => 'filePrestations',
+                'model' => 'prestations',
+                'label' => 'Prestations',
+                'color' => 'teal',
+                'icon' => 'list',
+                ],
+                [
+                'ref' => 'filePaiements',
+                'model' => 'paiements',
+                'label' => 'Paiements',
+                'color' => 'blue',
+                'icon' => 'payment',
+                ],
+                ];
+                @endphp --}}
 
-                    {{-- Icône --}}
-                    <svg class="w-8 h-8 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                {{-- Factures --}}
+                <div class="relative flex flex-col items-center justify-center gap-2 p-5
+                                                    border-2 border-dashed rounded-xl cursor-pointer select-none
+                                                    border-amber-300 dark:border-amber-700 transition-colors duration-200
+                                                    hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                    @click="$refs.fileFactures.click()"
+                    :class="files.factures ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-400' : ''">
+                    <svg class="w-9 h-9 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                             d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414A1 1 0 0121 9.414V19a2 2 0 01-2 2z" />
                     </svg>
-
-                    <span class="text-xs font-medium text-amber-700 dark:text-amber-300">Factures</span>
-                    <span class="text-xs text-gray-400 dark:text-gray-500 text-center"
-                        x-text="files.factures ? files.factures.name : 'Cliquer ou glisser'">
-                    </span>
-
-                    {{-- Badge check --}}
-                    <span x-show="files.factures"
-                        class="absolute top-2 right-2 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
+                    <span class="text-xs font-semibold text-amber-700 dark:text-amber-300">Factures</span>
+                    <span class="text-xs text-gray-400 dark:text-gray-500 text-center leading-tight"
+                        x-text="files.factures ? files.factures.name : 'Cliquer ou glisser un fichier .xlsx'"></span>
+                    <span x-show="files.factures" x-cloak class="absolute top-2 right-2 w-5 h-5 bg-green-500 rounded-full
+                                                         flex items-center justify-center shadow-sm">
                         <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
                         </svg>
                     </span>
-
                     <input x-ref="fileFactures" type="file" accept=".xlsx,.xls" class="hidden"
                         @change="files.factures = $event.target.files[0]" />
                 </div>
 
-                {{-- Zone Prestations --}}
-                <div class="relative flex flex-col items-center justify-center gap-2 p-4
-                                                                    border-2 border-dashed rounded-xl cursor-pointer transition-colors
-                                                                    border-teal-300 dark:border-teal-700
-                                                                    hover:bg-teal-50 dark:hover:bg-teal-900/20"
+                {{-- Prestations --}}
+                <div class="relative flex flex-col items-center justify-center gap-2 p-5
+                                                    border-2 border-dashed rounded-xl cursor-pointer select-none
+                                                    border-teal-300 dark:border-teal-700 transition-colors duration-200
+                                                    hover:bg-teal-50 dark:hover:bg-teal-900/20"
                     @click="$refs.filePrestations.click()"
-                    :class="files.prestations ? 'bg-teal-50 dark:bg-teal-900/20' : ''">
-
-                    <svg class="w-8 h-8 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    :class="files.prestations ? 'bg-teal-50 dark:bg-teal-900/20 border-teal-400' : ''">
+                    <svg class="w-9 h-9 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                             d="M4 6h16M4 10h16M4 14h10M4 18h6" />
                     </svg>
-
-                    <span class="text-xs font-medium text-teal-700 dark:text-teal-300">Prestations</span>
-                    <span class="text-xs text-gray-400 dark:text-gray-500 text-center"
-                        x-text="files.prestations ? files.prestations.name : 'Cliquer ou glisser'">
-                    </span>
-
-                    <span x-show="files.prestations"
-                        class="absolute top-2 right-2 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
+                    <span class="text-xs font-semibold text-teal-700 dark:text-teal-300">Prestations</span>
+                    <span class="text-xs text-gray-400 dark:text-gray-500 text-center leading-tight"
+                        x-text="files.prestations ? files.prestations.name : 'Cliquer ou glisser un fichier .xlsx'"></span>
+                    <span x-show="files.prestations" x-cloak class="absolute top-2 right-2 w-5 h-5 bg-green-500 rounded-full
+                                                         flex items-center justify-center shadow-sm">
                         <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
                         </svg>
                     </span>
-
                     <input x-ref="filePrestations" type="file" accept=".xlsx,.xls" class="hidden"
                         @change="files.prestations = $event.target.files[0]" />
                 </div>
 
-                {{-- Zone Paiements --}}
-                <div class="relative flex flex-col items-center justify-center gap-2 p-4
-                                                                    border-2 border-dashed rounded-xl cursor-pointer transition-colors
-                                                                    border-blue-300 dark:border-blue-700
-                                                                    hover:bg-blue-50 dark:hover:bg-blue-900/20"
-                    @click="$refs.filePaiements.click()" :class="files.paiements ? 'bg-blue-50 dark:bg-blue-900/20' : ''">
-
-                    <svg class="w-8 h-8 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                {{-- Paiements --}}
+                <div class="relative flex flex-col items-center justify-center gap-2 p-5
+                                                    border-2 border-dashed rounded-xl cursor-pointer select-none
+                                                    border-blue-300 dark:border-blue-700 transition-colors duration-200
+                                                    hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                    @click="$refs.filePaiements.click()"
+                    :class="files.paiements ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-400' : ''">
+                    <svg class="w-9 h-9 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                             d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2z" />
                     </svg>
-
-                    <span class="text-xs font-medium text-blue-700 dark:text-blue-300">Paiements</span>
-                    <span class="text-xs text-gray-400 dark:text-gray-500 text-center"
-                        x-text="files.paiements ? files.paiements.name : 'Cliquer ou glisser'">
-                    </span>
-
-                    <span x-show="files.paiements"
-                        class="absolute top-2 right-2 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
+                    <span class="text-xs font-semibold text-blue-700 dark:text-blue-300">Paiements</span>
+                    <span class="text-xs text-gray-400 dark:text-gray-500 text-center leading-tight"
+                        x-text="files.paiements ? files.paiements.name : 'Cliquer ou glisser un fichier .xlsx'"></span>
+                    <span x-show="files.paiements" x-cloak class="absolute top-2 right-2 w-5 h-5 bg-green-500 rounded-full
+                                                         flex items-center justify-center shadow-sm">
                         <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
                         </svg>
                     </span>
-
                     <input x-ref="filePaiements" type="file" accept=".xlsx,.xls" class="hidden"
                         @change="files.paiements = $event.target.files[0]" />
                 </div>
-                {{-- Zone Factures Payées --}}
-                <div class="relative flex flex-col items-center justify-center gap-2 p-4
-                                            border-2 border-dashed rounded-xl cursor-pointer transition-colors
-                                            border-green-300 dark:border-green-700
-                                            hover:bg-green-50 dark:hover:bg-green-900/20"
-                    @click="$refs.fileFacturesPayees.click()"
-                    :class="files.factures_payees ? 'bg-green-50 dark:bg-green-900/20' : ''">
+            </div>
 
-                    <svg class="w-8 h-8 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            {{-- Séparateur avec label --}}
+            <div class="flex items-center gap-3 my-4">
+                <div class="flex-1 h-px bg-gray-200 dark:bg-gray-700"></div>
+                <span class="text-xs text-gray-400 dark:text-gray-500 font-medium uppercase tracking-wide px-2">
+                    Historique des paiements
+                </span>
+                <div class="flex-1 h-px bg-gray-200 dark:bg-gray-700"></div>
+            </div>
+
+            {{-- Ligne 2 : 2 zones centrées --}}
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl mx-auto mb-6">
+
+                {{-- Factures Payées --}}
+                <div class="relative flex flex-col items-center justify-center gap-2 p-5
+                                                    border-2 border-dashed rounded-xl cursor-pointer select-none
+                                                    border-green-300 dark:border-green-700 transition-colors duration-200
+                                                    hover:bg-green-50 dark:hover:bg-green-900/20"
+                    @click="$refs.fileFacturesPayees.click()"
+                    :class="files.factures_payees ? 'bg-green-50 dark:bg-green-900/20 border-green-400' : ''">
+                    <svg class="w-9 h-9 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                             d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    <span class="text-xs font-medium text-green-700 dark:text-green-300">Factures Payées</span>
-                    <span class="text-xs text-gray-400 text-center"
-                        x-text="files.factures_payees ? files.factures_payees.name : 'Cliquer ou glisser'"></span>
-
-                    <span x-show="files.factures_payees"
-                        class="absolute top-2 right-2 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
+                    <span class="text-xs font-semibold text-green-700 dark:text-green-300">Factures Payées</span>
+                    <span class="text-xs text-gray-400 dark:text-gray-500 text-center leading-tight"
+                        x-text="files.factures_payees ? files.factures_payees.name : 'Cliquer ou glisser un fichier .xlsx'"></span>
+                    <span x-show="files.factures_payees" x-cloak class="absolute top-2 right-2 w-5 h-5 bg-green-500 rounded-full
+                                                         flex items-center justify-center shadow-sm">
                         <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
                         </svg>
                     </span>
-
                     <input x-ref="fileFacturesPayees" type="file" accept=".xlsx,.xls" class="hidden"
                         @change="files.factures_payees = $event.target.files[0]" />
                 </div>
 
-                {{-- Zone Prestations Payées --}}
-                <div class="relative flex flex-col items-center justify-center gap-2 p-4
-                                            border-2 border-dashed rounded-xl cursor-pointer transition-colors
-                                            border-purple-300 dark:border-purple-700
-                                            hover:bg-purple-50 dark:hover:bg-purple-900/20"
+                {{-- Prestations Payées --}}
+                <div class="relative flex flex-col items-center justify-center gap-2 p-5
+                                                    border-2 border-dashed rounded-xl cursor-pointer select-none
+                                                    border-purple-300 dark:border-purple-700 transition-colors duration-200
+                                                    hover:bg-purple-50 dark:hover:bg-purple-900/20"
                     @click="$refs.filePrestationsPayees.click()"
-                    :class="files.prestations_payees ? 'bg-purple-50 dark:bg-purple-900/20' : ''">
-
-                    <svg class="w-8 h-8 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                    :class="files.prestations_payees ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-400' : ''">
+                    <svg class="w-9 h-9 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2
+                                                         M9 5a2 2 0 002 2h2a2 2 0 002-2
+                                                         M9 5a2 2 0 012-2h2a2 2 0 012 2
+                                                         m-6 9l2 2 4-4" />
                     </svg>
-                    <span class="text-xs font-medium text-purple-700 dark:text-purple-300">Prestations Payées</span>
-                    <span class="text-xs text-gray-400 text-center"
-                        x-text="files.prestations_payees ? files.prestations_payees.name : 'Cliquer ou glisser'"></span>
-
-                    <span x-show="files.prestations_payees"
-                        class="absolute top-2 right-2 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
+                    <span class="text-xs font-semibold text-purple-700 dark:text-purple-300">Prestations Payées</span>
+                    <span class="text-xs text-gray-400 dark:text-gray-500 text-center leading-tight"
+                        x-text="files.prestations_payees ? files.prestations_payees.name : 'Cliquer ou glisser un fichier .xlsx'"></span>
+                    <span x-show="files.prestations_payees" x-cloak class="absolute top-2 right-2 w-5 h-5 bg-green-500 rounded-full
+                                                         flex items-center justify-center shadow-sm">
                         <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
                         </svg>
                     </span>
-
                     <input x-ref="filePrestationsPayees" type="file" accept=".xlsx,.xls" class="hidden"
                         @change="files.prestations_payees = $event.target.files[0]" />
                 </div>
             </div>
 
-            <button @click="submit()" :disabled="!hasAnyFile || isProcessing"
-                class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium
-                                                                   text-white bg-blue-600 hover:bg-blue-700 transition-colors
-                                                                   disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed">
+            {{-- Bouton lancer --}}
+            <div class="flex items-center gap-4">
+                <button @click="submit()" :disabled="!hasAnyFile || isProcessing" class="inline-flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-semibold
+                                                       text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800
+                                                       disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed
+                                                       transition-colors shadow-sm">
+                    <svg x-show="!isProcessing" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                    </svg>
+                    <svg x-show="isProcessing" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                    </svg>
+                    <span
+                        x-text="isProcessing
+                                                ? 'Traitement en cours…'
+                                                : 'Lancer l\'import (' + fileCount + ' fichier' + (fileCount > 1 ? 's' : '') + ')'">
+                    </span>
+                </button>
 
-                <svg x-show="!isProcessing" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                </svg>
-                <svg x-show="isProcessing" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                </svg>
-
-                <span
-                    x-text="isProcessing
-                                                            ? 'Import en cours…'
-                                                            : 'Lancer l\'import (' + fileCount + ' fichier' + (fileCount > 1 ? 's' : '') + ')'">
+                {{-- Compteur fichiers sélectionnés --}}
+                <span x-show="hasAnyFile && !isProcessing" class="text-sm text-gray-500 dark:text-gray-400">
+                    <span x-text="fileCount"></span> fichier(s) prêt(s)
                 </span>
-            </button>
+            </div>
         </div>
 
-        {{-- ── 3 barres de progression ─────────────────────────────────────────── --}}
+        {{-- ── Barres de progression ────────────────────────────────────────────────── --}}
+        @php
+            $typeConfig = [
+                'factures' => ['label' => 'Factures', 'color' => 'amber'],
+                'prestations' => ['label' => 'Prestations', 'color' => 'teal'],
+                'paiements' => ['label' => 'Paiements', 'color' => 'blue'],
+                'factures_payees' => ['label' => 'Factures Payées', 'color' => 'green'],
+                'prestations_payees' => ['label' => 'Prestations Payées', 'color' => 'purple'],
+            ];
+        @endphp
+
         <template x-for="(prog, type) in progresses" :key="type">
-            <div x-show="prog.visible" x-transition
-                class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 mb-4">
+            <div x-show="prog.visible" x-transition:enter="transition ease-out duration-300"
+                x-transition:enter-start="opacity-0 -translate-y-2" x-transition:enter-end="opacity-100 translate-y-0"
+                class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200
+                                                dark:border-gray-700 p-5 mb-3">
 
-                <div class="flex items-center justify-between mb-2">
-                    <div class="flex items-center gap-2">
-                        {{-- Pastille couleur par type --}}
+                {{-- En-tête de la barre --}}
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-2 min-w-0">
+
+                        {{-- Pastille couleur --}}
                         <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" :class="{
-                    'bg-amber-400':  type === 'factures',
-                    'bg-teal-400':   type === 'prestations',
-                    'bg-blue-400':   type === 'paiements',
-                    'bg-green-400':  type === 'factures_payees',
-                    'bg-purple-400': type === 'prestations_payees',
-                }"></span>
+                                                    'bg-amber-400':  type === 'factures',
+                                                    'bg-teal-400':   type === 'prestations',
+                                                    'bg-blue-400':   type === 'paiements',
+                                                    'bg-green-400':  type === 'factures_payees',
+                                                    'bg-purple-400': type === 'prestations_payees',
+                                                    'animate-pulse': prog.status === 'processing',
+                                                }"></span>
 
-                        {{-- Label lisible (remplace capitalize qui affiche "factures_payees" brut) --}}
-                        <span class="text-sm font-medium text-gray-800 dark:text-gray-100" x-text="{
-                          factures:           'Factures',
-                          prestations:        'Prestations',
-                          paiements:          'Paiements',
-                          factures_payees:    'Factures Payées',
-                          prestations_payees: 'Prestations Payées',
-                      }[type] ?? type">
-                        </span>
-
-                        <span class="text-sm font-medium text-gray-800 dark:text-gray-100 capitalize" x-text="type"></span>
+                        {{-- Label lisible --}}
+                        <span class="text-sm font-semibold text-gray-800 dark:text-gray-100" x-text="{
+                                                    factures:           'Factures',
+                                                    prestations:        'Prestations',
+                                                    paiements:          'Paiements',
+                                                    factures_payees:    'Factures Payées',
+                                                    prestations_payees: 'Prestations Payées',
+                                                }[type] ?? type"></span>
 
                         {{-- Badge statut --}}
-                        <span class="px-2 py-0.5 rounded-full text-xs font-medium" :class="{
-                                                                          'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200': prog.status === 'pending',
-                                                                          'bg-blue-100   text-blue-800   dark:bg-blue-900   dark:text-blue-200':   prog.status === 'processing',
-                                                                          'bg-green-100  text-green-800  dark:bg-green-900  dark:text-green-200':  prog.status === 'completed',
-                                                                          'bg-red-100    text-red-800    dark:bg-red-900    dark:text-red-200':    prog.status === 'failed',
-                                                                      }" x-text="statusLabels[prog.status] ?? prog.status">
+                        <span class="px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0" :class="{
+                                                    'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300': prog.status === 'pending',
+                                                    'bg-blue-100   text-blue-700   dark:bg-blue-900/50   dark:text-blue-300':   prog.status === 'processing',
+                                                    'bg-green-100  text-green-700  dark:bg-green-900/50  dark:text-green-300':  prog.status === 'completed',
+                                                    'bg-red-100    text-red-700    dark:bg-red-900/50    dark:text-red-300':    prog.status === 'failed',
+                                                }"
+                            x-text="{ pending: 'En attente', processing: 'En cours', completed: 'Terminé', failed: 'Échec' }[prog.status] ?? prog.status">
                         </span>
 
-                        <span class="text-xs text-gray-400 dark:text-gray-500"
-                            x-text="prog.started_at ? 'démarré ' + prog.started_at : 'en attente de la chaîne…'">
+                        {{-- Temps écoulé --}}
+                        <span class="text-xs text-gray-400 dark:text-gray-500 truncate hidden sm:block"
+                            x-text="prog.started_at ? 'démarré ' + prog.started_at : ''">
                         </span>
                     </div>
 
-                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300"
-                        x-text="prog.percentage + '%'"></span>
+                    {{-- Pourcentage --}}
+                    <span class="text-sm font-bold tabular-nums ml-3 flex-shrink-0" :class="{
+                                                      'text-gray-700 dark:text-gray-300': prog.status !== 'completed' && prog.status !== 'failed',
+                                                      'text-green-600': prog.status === 'completed',
+                                                      'text-red-600':   prog.status === 'failed',
+                                                  }" x-text="prog.percentage + '%'">
+                    </span>
                 </div>
 
-                {{-- Barre --}}
                 {{-- Barre de progression --}}
-                <div class="h-2.5 rounded-full transition-all duration-500" :class="{
-                'bg-amber-400':  type === 'factures'           && prog.status !== 'completed' && prog.status !== 'failed',
-                'bg-teal-400':   type === 'prestations'        && prog.status !== 'completed' && prog.status !== 'failed',
-                'bg-blue-400':   type === 'paiements'          && prog.status !== 'completed' && prog.status !== 'failed',
-                'bg-green-400':  type === 'factures_payees'    && prog.status !== 'completed' && prog.status !== 'failed',
-                'bg-purple-400': type === 'prestations_payees' && prog.status !== 'completed' && prog.status !== 'failed',
-                'bg-green-500':  prog.status === 'completed',
-                'bg-red-500':    prog.status === 'failed',
-            }" :style="'width: ' + prog.percentage + '%'">
+                <div class="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2 overflow-hidden mb-3">
+                    <div class="h-2 rounded-full transition-all duration-500 ease-out" :class="{
+                                                'bg-amber-400':  type === 'factures'           && prog.status !== 'completed' && prog.status !== 'failed',
+                                                'bg-teal-400':   type === 'prestations'        && prog.status !== 'completed' && prog.status !== 'failed',
+                                                'bg-blue-400':   type === 'paiements'          && prog.status !== 'completed' && prog.status !== 'failed',
+                                                'bg-green-400':  type === 'factures_payees'    && prog.status !== 'completed' && prog.status !== 'failed',
+                                                'bg-purple-400': type === 'prestations_payees' && prog.status !== 'completed' && prog.status !== 'failed',
+                                                'bg-green-500':  prog.status === 'completed',
+                                                'bg-red-500':    prog.status === 'failed',
+                                            }" :style="'width: ' + prog.percentage + '%'">
+                    </div>
                 </div>
 
                 {{-- Compteurs --}}
-                <div class="flex flex-wrap gap-4 text-xs text-gray-500 dark:text-gray-400">
-                    <span>
+                <div class="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs">
+                    <span class="text-gray-500 dark:text-gray-400 tabular-nums">
                         <strong class="text-gray-800 dark:text-gray-200"
-                            x-text="prog.processed.toLocaleString('fr-DZ')"></strong>
-                        <span x-text="' / ' + prog.total.toLocaleString('fr-DZ') + ' lignes'"></span>
+                            x-text="prog.processed.toLocaleString('fr-FR')"></strong>
+                        <span x-text="' / ' + prog.total.toLocaleString('fr-FR') + ' lignes'"></span>
                     </span>
-                    <span x-show="prog.failed > 0" class="text-red-500">
-                        <strong x-text="prog.failed"></strong> ignorées
+
+                    <span x-show="prog.failed > 0" class="text-red-500 font-medium">
+                        <i class="fa-solid fa-triangle-exclamation mr-1"></i>
+                        <span x-text="prog.failed.toLocaleString('fr-FR')"></span> ignorées
                     </span>
-                    <span x-show="prog.status === 'completed'" class="text-green-600 dark:text-green-400">
+
+                    <span x-show="prog.status === 'completed'" class="text-green-600 dark:text-green-400 font-medium">
+                        <i class="fa-solid fa-circle-check mr-1"></i>
                         Terminé le <span x-text="prog.completed_at"></span>
                     </span>
-                    <span x-show="prog.status === 'failed'" class="text-red-500">
-                        Échec — vérifiez les logs
+
+                    <span x-show="prog.status === 'failed'" class="text-red-500 font-medium">
+                        <i class="fa-solid fa-circle-xmark mr-1"></i>
+                        Import échoué — consultez les logs Laravel
+                    </span>
+
+                    <span x-show="prog.status === 'pending'" class="text-gray-400 dark:text-gray-500 italic">
+                        En attente du job précédent…
                     </span>
                 </div>
             </div>
         </template>
 
-        {{-- ── Historique ───────────────────────────────────────────────────────── --}}
+        {{-- ── Historique des imports ───────────────────────────────────────────────── --}}
         <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-700">
-                <h2 class="text-base font-medium text-gray-900 dark:text-white">Historique des imports</h2>
+
+            <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
+                <h2 class="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                    <i class="fa-solid fa-clock-rotate-left text-gray-400"></i>
+                    Historique des imports
+                </h2>
+                <span class="text-xs text-gray-400 dark:text-gray-500">
+                    {{ $batches->total() }} import(s) au total
+                </span>
             </div>
 
-            <table class="w-full text-sm">
-                <thead class="bg-gray-50 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 text-xs uppercase">
-                    <tr>
-                        <th class="px-5 py-3 text-left">Fichier</th>
-                        <th class="px-5 py-3 text-left">Type</th>
-                        <th class="px-5 py-3 text-left">Statut</th>
-                        <th class="px-5 py-3 text-right">Lignes</th>
-                        <th class="px-5 py-3 text-left">Date</th>
-                        <th class="px-5 py-3 text-left">Par</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
-                    @forelse($batches as $batch)
-                                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
-                                        <td class="px-5 py-3 text-gray-900 dark:text-white font-mono text-xs
-                                                                                                                                               truncate max-w-[160px]"
-                                            title="{{ $batch->original_filename }}">
-                                            {{ $batch->original_filename }}
-                                        </td>
-                                        <td class="px-5 py-3">
-                                            @php
-                                                $typeColors = [
-                                                    'factures' => 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
-                                                    'prestations' => 'bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200',
-                                                    'paiements' => 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-                                                    'factures_payees' => 'bg-green-100  text-green-800  dark:bg-green-900  dark:text-green-200',
-                                                    'prestations_payees' => 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
-
-                                                ];
-                                                $typeLabels = [
-                                                    'factures' => 'Factures',
-                                                    'prestations' => 'Prestations',
-                                                    'paiements' => 'Paiements',
-                                                    'factures_payees' => 'Factures Payées',
-                                                    'prestations_payees' => 'Prestations Payées',
-                                                ];
-                                            @endphp
-                                            <span
-                                                class="px-2 py-0.5 rounded-full text-xs font-medium {{ $typeColors[$batch->type] ?? 'bg-gray-100 text-gray-600' }}">
-                                                {{ $typeLabels[$batch->type] ?? ucfirst($batch->type) }}
-                                            </span>
-                                        </td>
-                                        <td class="px-5 py-3">
-                                            @php
-                                                $statusColors = [
-                                                    'pending' => 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
-                                                    'processing' => 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-                                                    'completed' => 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-                                                    'failed' => 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
-                                                ];
-                                                $statusLabels = [
-                                                    'pending' => 'En attente',
-                                                    'processing' => 'En cours',
-                                                    'completed' => 'Terminé',
-                                                    'failed' => 'Échec',
-                                                ];
-                                            @endphp
-                                            <span
-                                                class="px-2 py-0.5 rounded-full text-xs font-medium
-                                                                                                                                                     {{ $statusColors[$batch->status] ?? '' }}">
-                                                {{ $statusLabels[$batch->status] ?? $batch->status }}
-                                            </span>
-                                        </td>
-                                        <td class="px-5 py-3 text-right text-gray-600 dark:text-gray-300 tabular-nums">
-                                            {{ number_format($batch->processed_rows, 0, ',', ' ') }}
-                                            / {{ number_format($batch->total_rows, 0, ',', ' ') }}
-                                            @if($batch->failed_rows > 0)
-                                                <span class="text-red-400 text-xs ml-1">({{ $batch->failed_rows }} ign.)</span>
-                                            @endif
-                                        </td>
-                                        <td class="px-5 py-3 text-gray-500 dark:text-gray-400 tabular-nums">
-                                            {{ $batch->created_at->format('d/m/Y H:i') }}
-                                        </td>
-                                        <td class="px-5 py-3 text-gray-500 dark:text-gray-400">
-                                            {{ $batch->creator?->name ?? '—' }}
-                                        </td>
-                                    </tr>
-                    @empty
-                        <tr>
-                            <td colspan="6" class="px-5 py-10 text-center text-gray-400 dark:text-gray-500">
-                                Aucun import effectué.
-                            </td>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-700">
+                        <tr class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                            <th class="px-5 py-3 text-left">Fichier</th>
+                            <th class="px-5 py-3 text-left">Type</th>
+                            <th class="px-5 py-3 text-left">Statut</th>
+                            <th class="px-5 py-3 text-right">Lignes</th>
+                            <th class="px-5 py-3 text-right hidden md:table-cell">Ignorées</th>
+                            <th class="px-5 py-3 text-left hidden sm:table-cell">Date</th>
+                            <th class="px-5 py-3 text-left hidden md:table-cell">Par</th>
+                            {{-- En-tête --}}
+                            <th class="px-5 py-3 text-center hidden md:table-cell">Action</th>
                         </tr>
-                    @endforelse
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                        @forelse($batches as $batch)
+                            @php
+                                $typeColors = [
+                                    'factures' => 'bg-amber-100  text-amber-800  dark:bg-amber-900/50  dark:text-amber-200',
+                                    'prestations' => 'bg-teal-100   text-teal-800   dark:bg-teal-900/50   dark:text-teal-200',
+                                    'paiements' => 'bg-blue-100   text-blue-800   dark:bg-blue-900/50   dark:text-blue-200',
+                                    'factures_payees' => 'bg-green-100  text-green-800  dark:bg-green-900/50  dark:text-green-200',
+                                    'prestations_payees' => 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-200',
+                                ];
+                                $typeLabels = [
+                                    'factures' => 'Factures',
+                                    'prestations' => 'Prestations',
+                                    'paiements' => 'Paiements',
+                                    'factures_payees' => 'Factures Payées',
+                                    'prestations_payees' => 'Prestations Payées',
+                                ];
+                                $statusColors = [
+                                    'pending' => 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300',
+                                    'processing' => 'bg-blue-100   text-blue-700   dark:bg-blue-900/50   dark:text-blue-300',
+                                    'completed' => 'bg-green-100  text-green-700  dark:bg-green-900/50  dark:text-green-300',
+                                    'failed' => 'bg-red-100    text-red-700    dark:bg-red-900/50    dark:text-red-300',
+                                ];
+                                $statusLabels = [
+                                    'pending' => 'En attente',
+                                    'processing' => 'En cours',
+                                    'completed' => 'Terminé',
+                                    'failed' => 'Échec',
+                                ];
+                                $progressPct = $batch->total_rows > 0
+                                    ? min(100, round($batch->processed_rows / $batch->total_rows * 100))
+                                    : ($batch->status === 'completed' ? 100 : 0);
+                            @endphp
+                            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
 
-            <div class="px-5 py-3 border-t border-gray-100 dark:border-gray-700">
-                {{ $batches->links() }}
+                                {{-- Fichier --}}
+                                <td class="px-5 py-3 max-w-[180px]">
+                                    <span class="font-mono text-xs text-gray-700 dark:text-gray-300 block truncate"
+                                        title="{{ $batch->original_filename }}">
+                                        {{ $batch->original_filename }}
+                                    </span>
+                                </td>
+
+                                {{-- Type --}}
+                                <td class="px-5 py-3">
+                                    <span
+                                        class="px-2 py-0.5 rounded-full text-xs font-medium
+                                                                                                 {{ $typeColors[$batch->type] ?? 'bg-gray-100 text-gray-600' }}">
+                                        {{ $typeLabels[$batch->type] ?? ucfirst($batch->type) }}
+                                    </span>
+                                </td>
+
+                                {{-- Statut --}}
+                                <td class="px-5 py-3">
+                                    <div class="flex flex-col gap-1">
+                                        <span
+                                            class="px-2 py-0.5 rounded-full text-xs font-medium w-fit
+                                                                                                     {{ $statusColors[$batch->status] ?? '' }}">
+                                            {{ $statusLabels[$batch->status] ?? $batch->status }}
+                                        </span>
+                                        @if(in_array($batch->status, ['processing', 'completed']))
+                                            <div class="w-20 h-1 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
+                                                <div class="h-1 rounded-full {{ $batch->status === 'completed' ? 'bg-green-500' : 'bg-blue-400' }}"
+                                                    style="width: {{ $progressPct }}%"></div>
+                                            </div>
+                                        @endif
+                                    </div>
+                                </td>
+                                {{-- Lignes --}}
+                                <td class="px-5 py-3 text-right tabular-nums">
+                                    <span class="font-medium text-gray-800 dark:text-gray-200 text-xs">
+                                        {{ number_format($batch->processed_rows, 0, ',', ' ') }}
+                                    </span>
+                                    <span class="text-gray-400 text-xs">
+                                        / {{ number_format($batch->total_rows, 0, ',', ' ') }}
+                                    </span>
+                                </td>
+
+                                {{-- Ignorées --}}
+                                <td class="px-5 py-3 text-right hidden md:table-cell">
+                                    @if($batch->failed_rows > 0)
+                                        <span class="text-red-500 text-xs font-medium tabular-nums">
+                                            {{ number_format($batch->failed_rows, 0, ',', ' ') }}
+                                        </span>
+                                    @else
+                                        <span class="text-gray-300 dark:text-gray-600 text-xs">—</span>
+                                    @endif
+                                </td>
+
+                                {{-- Date --}}
+                                <td class="px-5 py-3 hidden sm:table-cell">
+                                    <span class="text-gray-500 dark:text-gray-400 text-xs tabular-nums">
+                                        {{ $batch->created_at->format('d/m/Y') }}
+                                    </span>
+                                    <span class="text-gray-400 dark:text-gray-500 text-xs block">
+                                        {{ $batch->created_at->format('H:i') }}
+                                    </span>
+                                </td>
+
+                                {{-- Par --}}
+                                <td class="px-5 py-3 hidden md:table-cell">
+                                    <span class="text-gray-500 dark:text-gray-400 text-xs">
+                                        {{ $batch->creator?->name ?? '—' }}
+                                    </span>
+                                </td>
+
+
+                                {{-- Cellule dans le @forelse --}}
+                                <td class="px-5 py-3 text-center hidden md:table-cell">
+                                    @if(in_array($batch->status, ['completed', 'failed', 'pending']))
+                                        <button onclick="deleteBatch({{ $batch->id }}, '{{ $batch->original_filename }}')"
+                                            class="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50
+                                                                                           dark:hover:bg-red-900/20 rounded-lg transition-all" title="Supprimer">
+                                            <i class="fa-solid fa-trash text-sm"></i>
+                                        </button>
+                                    @else
+                                        {{-- En cours : bouton désactivé --}}
+                                        <span class="p-1.5 text-gray-200 dark:text-gray-600 cursor-not-allowed"
+                                            title="Import en cours — suppression impossible">
+                                            <i class="fa-solid fa-trash text-sm"></i>
+                                        </span>
+                                    @endif
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="7" class="px-5 py-12 text-center">
+                                    <i class="fa-solid fa-inbox text-4xl text-gray-200 dark:text-gray-600 mb-3 block"></i>
+                                    <p class="text-gray-400 dark:text-gray-500 text-sm">Aucun import effectué.</p>
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
             </div>
+
+            @if($batches->hasPages())
+                <div class="px-5 py-3 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/30">
+                    {{ $batches->links() }}
+                </div>
+            @endif
         </div>
     </div>
-
-
     <script>
+        // ── Fonction globale (EN DEHORS de importUploader) ────────────────────────
+        async function deleteBatch(id, filename) {
+            if (!confirm(`Supprimer l'import "${filename}" ?\nLe fichier Excel sera également effacé.`)) {
+                return;
+            }
+
+            try {
+                const res = await fetch(`{{ url('admin/imports') }}/${id}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    },
+                });
+
+                const data = await res.json();
+
+                if (!res.ok) {
+                    alert(data.message ?? 'Erreur lors de la suppression.');
+                    return;
+                }
+
+                window.location.reload();
+
+            } catch (err) {
+                alert('Erreur réseau : ' + err.message);
+            }
+        }
+
+        // ── Composant Alpine.js ───────────────────────────────────────────────────
         function importUploader() {
             return {
-                // ── Fichiers sélectionnés ─────────────────────────────────────────
                 files: {
                     factures: null,
                     prestations: null,
                     paiements: null,
-                    factures_payees: null,   // ← nouveau
-                    prestations_payees: null,   // ← nouveau
+                    factures_payees: null,
+                    prestations_payees: null,
                 },
 
-                // ── État général ──────────────────────────────────────────────────
                 isProcessing: false,
                 pollingInterval: null,
 
-                // ── Batch IDs retournés par le serveur ────────────────────────────
                 batchIds: {
                     factures: null,
                     prestations: null,
                     paiements: null,
-                    factures_payees: null,   // ← nouveau
-                    prestations_payees: null,   // ← nouveau
+                    factures_payees: null,
+                    prestations_payees: null,
                 },
 
-                // ── Progression par type ──────────────────────────────────────────
                 progresses: {
                     factures: { visible: false, status: 'pending', processed: 0, total: 0, failed: 0, percentage: 0, started_at: null, completed_at: null },
                     prestations: { visible: false, status: 'pending', processed: 0, total: 0, failed: 0, percentage: 0, started_at: null, completed_at: null },
                     paiements: { visible: false, status: 'pending', processed: 0, total: 0, failed: 0, percentage: 0, started_at: null, completed_at: null },
                     factures_payees: { visible: false, status: 'pending', processed: 0, total: 0, failed: 0, percentage: 0, started_at: null, completed_at: null },
                     prestations_payees: { visible: false, status: 'pending', processed: 0, total: 0, failed: 0, percentage: 0, started_at: null, completed_at: null },
-                },
-
-                statusLabels: {
-                    pending: 'En attente',
-                    processing: 'En cours',
-                    completed: 'Terminé',
-                    failed: 'Échec',
                 },
 
                 // ── Computed ──────────────────────────────────────────────────────
@@ -412,7 +582,7 @@
 
                 get allDone() {
                     return Object.entries(this.batchIds).every(([type, id]) => {
-                        if (!id) return true; // pas envoyé = ignoré
+                        if (!id) return true;
                         const s = this.progresses[type].status;
                         return s === 'completed' || s === 'failed';
                     });
@@ -430,7 +600,6 @@
                     const formData = new FormData();
                     formData.append('_token', '{{ csrf_token() }}');
 
-                    // ✅ Les 5 fichiers dans l'ordre de la chaîne
                     if (this.files.factures) formData.append('file_factures', this.files.factures);
                     if (this.files.prestations) formData.append('file_prestations', this.files.prestations);
                     if (this.files.paiements) formData.append('file_paiements', this.files.paiements);
@@ -453,27 +622,31 @@
                         try {
                             data = JSON.parse(text);
                         } catch {
-                            console.error('Réponse brute reçue :', text.substring(0, 500));
-                            const hint = res.status === 413
-                                ? 'Fichier trop volumineux — augmentez upload_max_filesize dans php.ini'
-                                : `Le serveur a retourné du HTML (status ${res.status}). Voir la console.`;
-                            throw new Error(hint);
+                            console.error('Réponse brute :', text.substring(0, 500));
+                            throw new Error(
+                                res.status === 413
+                                    ? 'Fichier trop volumineux. Augmentez upload_max_filesize dans php.ini.'
+                                    : `Réponse non-JSON (HTTP ${res.status}). Voir la console.`
+                            );
                         }
 
                         if (!res.ok) {
-                            console.error('Réponse erreur complète :', data);
-                            const msg = data.message
+                            console.error('Erreur serveur :', data);
+                            throw new Error(
+                                data.message
                                 ?? Object.values(data.errors ?? {}).flat().join('\n')
-                                ?? `Erreur ${res.status}`;
-                            throw new Error(msg);
+                                ?? `Erreur ${res.status}`
+                            );
                         }
 
-                        // ── Succès : initialiser les barres pour chaque batch retourné ───
+                        // Initialiser les barres pour chaque batch créé
                         for (const [type, id] of Object.entries(data.batch_ids)) {
                             this.batchIds[type] = id;
                             this.progresses[type].visible = true;
                             this.progresses[type].status = 'pending';
                             this.progresses[type].percentage = 0;
+                            this.progresses[type].processed = 0;
+                            this.progresses[type].total = 0;
                         }
 
                         this.startPolling();
@@ -484,33 +657,15 @@
                     }
                 },
 
-                // ── Helper : message d'erreur selon le code HTTP ─────────────────────
-                buildUploadErrorMessage(status, hint) {
-                    const messages = {
-                        413: 'Fichier trop volumineux (erreur 413).\n' +
-                            'Contactez l\'administrateur serveur pour augmenter upload_max_filesize.',
-                        422: 'Données invalides : ' + hint,
-                        500: 'Erreur interne du serveur (500).\n' + hint,
-                        502: 'Le serveur est temporairement indisponible (502).',
-                        503: 'Service indisponible (503). Réessayez dans quelques instants.',
-                    };
-                    return messages[status] ??
-                        `Erreur HTTP ${status} : ${hint}`;
-                },
                 // ── Polling ───────────────────────────────────────────────────────
                 startPolling() {
-                    // Poll toutes les 2s pour chaque batch soumis
                     this.pollingInterval = setInterval(() => this.fetchAllProgress(), 2000);
                 },
 
                 async fetchAllProgress() {
-                    // ✅ Tous les 5 types surveillés
                     const types = [
-                        'factures',
-                        'prestations',
-                        'paiements',
-                        'factures_payees',
-                        'prestations_payees',
+                        'factures', 'prestations', 'paiements',
+                        'factures_payees', 'prestations_payees',
                     ];
 
                     await Promise.all(
@@ -532,6 +687,7 @@
 
                     try {
                         const res = await fetch(`{{ url('admin/imports') }}/${id}/progress`);
+                        if (!res.ok) return;
                         const data = await res.json();
 
                         this.progresses[type] = {
@@ -540,7 +696,7 @@
                             visible: true,
                         };
                     } catch (err) {
-                        console.error(`Erreur polling ${type}:`, err);
+                        console.error(`Polling [${type}] :`, err);
                     }
                 },
 
@@ -550,5 +706,4 @@
             };
         }
     </script>
-
 @endsection
