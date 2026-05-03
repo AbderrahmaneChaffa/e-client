@@ -1,197 +1,433 @@
+{{-- resources/views/admins/dashboard.blade.php --}}
 @extends('admins.layouts.admin')
 
 @section('content')
-<div class="space-y-6">
-    <!-- Page Header -->
-    <div class="flex justify-between items-center mb-8">
+<div class="min-h-screen bg-gray-50 dark:bg-gray-950 px-4 py-6 md:px-8">
+
+    {{-- ── En-tête ──────────────────────────────────────────────────────────── --}}
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
         <div>
-            <h2 class="text-3xl font-bold text-gray-800">Tableau de Bord</h2>
-            <p class="text-gray-500 mt-2">Vue d'ensemble de l'application E-Client</p>
-        </div>
-        <div class="text-right">
-            <p class="text-2xl font-bold text-blue-600">{{ $totalClients }} Clients</p>
-            <p class="text-sm text-gray-500">Actifs dans le système</p>
-        </div>
-    </div>
-
-    <!-- KPI Cards - Row 1 -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <!-- Total Facturé -->
-        <div class="stat-card bg-white rounded-lg shadow-md border border-gray-100 p-6" style="--color-start: #3b82f6; --color-end: #1e40af;">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-gray-600 text-sm font-medium">Total Facturé</p>
-                    <p class="text-3xl font-bold text-blue-900 mt-2">{{ number_format($stats->total_facture ?? 0, 0, ',', ' ') }}</p>
-                    <p class="text-xs text-gray-700 mt-2">{{ $stats->total_count ?? 0 }} factures</p>
-                </div>
-                <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
-                    <i class="fa-solid fa-file-invoice text-2xl text-blue-600"></i>
-                </div>
-            </div>
+            <p class="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-1">
+                Entreprise Portuaire d'Oran
+            </p>
+            <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
+                Tableau de bord
+            </h1>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                {{ now()->locale('fr')->isoFormat('dddd D MMMM YYYY') }}
+            </p>
         </div>
 
-        <!-- Total Encaissé -->
-        <div class="stat-card bg-white rounded-lg shadow-md border border-gray-100 p-6" style="--color-start: #10b981; --color-end: #059669;">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-gray-600 text-sm font-medium">Total Encaissé</p>
-                    <p class="text-3xl font-bold text-green-800 mt-2">{{ number_format($stats->total_encaisse ?? 0, 0, ',', ' ') }}</p>
-                    <p class="text-xs text-gray-500 mt-2 font-semibold">✓ Paiements reçus</p>
-                </div>
-                <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
-                    <i class="fa-solid fa-credit-card text-2xl text-green-600"></i>
-                </div>
-            </div>
-        </div>
-
-        <!-- Total Impayé -->
-        <div class="stat-card bg-white rounded-lg shadow-md border border-gray-100 p-6" style="--color-start: #ef4444; --color-end: #dc2626;">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-gray-600 text-sm font-medium">Reste à Payer</p>
-                    <p class="text-3xl font-bold text-red-800 mt-2">{{ number_format($stats->total_impayes ?? 0, 0, ',', ' ') }}</p>
-                    <p class="text-xs text-gray-500 mt-2">{{ $unpaidInvoices ?? 0 }} factures impayées</p>
-                </div>
-                <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
-                    <i class="fa-solid fa-exclamation-triangle text-2xl text-red-600"></i>
-                </div>
-            </div>
-        </div>
-
-        <!-- Taux de Recouvrement -->
-        <div class="stat-card bg-white rounded-lg shadow-md border border-gray-100 p-6" style="--color-start: #f59e0b; --color-end: #d97706;">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-gray-600 text-sm font-medium">Taux Recouvrement</p>
-                    <p class="text-3xl font-bold text-amber-600 mt-2">{{ number_format($recoveryRate, 1) }}%</p>
-                    <div class="w-full bg-gray-200 rounded-full h-2 mt-2">
-                        <div class="bg-amber-500 h-2 rounded-full recovery-bar" data-width="{{ min($recoveryRate, 100) }}"></div>
+        <div class="flex items-center gap-3">
+            {{-- Activité semaine --}}
+            <div class="hidden md:flex items-center gap-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5">
+                <div class="text-center">
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Cette semaine</p>
+                    <div class="flex items-center gap-3 mt-1">
+                        <span class="flex items-center gap-1 text-xs font-semibold text-blue-600">
+                            <i class="fa-solid fa-file-invoice text-[10px]"></i>
+                            {{ $weekStats['factures'] }} fact.
+                        </span>
+                        <span class="flex items-center gap-1 text-xs font-semibold text-green-600">
+                            <i class="fa-solid fa-coins text-[10px]"></i>
+                            {{ $weekStats['paiements'] }} paiem.
+                        </span>
                     </div>
                 </div>
-                <div class="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center">
-                    <i class="fa-solid fa-chart-pie text-2xl text-amber-600"></i>
+            </div>
+
+            <a href="{{ route('admin.imports.index') }}"
+               class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white
+                      text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors shadow-sm">
+                <i class="fa-solid fa-upload"></i>
+                <span class="hidden sm:inline">Importer ERP BIG</span>
+            </a>
+        </div>
+    </div>
+
+    {{-- ── KPI Cards ────────────────────────────────────────────────────────── --}}
+    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 mb-8">
+
+        {{-- Total Facturé --}}
+        <div class="group bg-white dark:bg-gray-800 rounded-2xl border border-gray-200
+                    dark:border-gray-700 p-5 shadow-sm hover:shadow-md transition-shadow
+                    relative overflow-hidden">
+            <div class="absolute inset-0 bg-gradient-to-br from-blue-50 to-transparent
+                        dark:from-blue-900/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+            <div class="relative">
+                <div class="flex items-start justify-between mb-4">
+                    <div class="w-11 h-11 bg-blue-100 dark:bg-blue-900/40 rounded-xl
+                                flex items-center justify-center">
+                        <i class="fa-solid fa-file-invoice text-blue-600 dark:text-blue-400"></i>
+                    </div>
+                    <span class="text-xs font-medium text-blue-600 dark:text-blue-400
+                                 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded-full">
+                        Total
+                    </span>
+                </div>
+                <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">
+                    Total Facturé
+                </p>
+                <p class="text-2xl font-bold text-gray-900 dark:text-white tabular-nums">
+                    {{ number_format($stats->total_facture ?? 0, 0, ',', ' ') }}
+                    <span class="text-sm font-medium text-gray-400">DA</span>
+                </p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                    {{ number_format($totalInvoices, 0, ',', ' ') }} factures actives
+                </p>
+            </div>
+        </div>
+
+        {{-- Total Encaissé --}}
+        <div class="group bg-white dark:bg-gray-800 rounded-2xl border border-gray-200
+                    dark:border-gray-700 p-5 shadow-sm hover:shadow-md transition-shadow
+                    relative overflow-hidden">
+            <div class="absolute inset-0 bg-gradient-to-br from-emerald-50 to-transparent
+                        dark:from-emerald-900/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+            <div class="relative">
+                <div class="flex items-start justify-between mb-4">
+                    <div class="w-11 h-11 bg-emerald-100 dark:bg-emerald-900/40 rounded-xl
+                                flex items-center justify-center">
+                        <i class="fa-solid fa-circle-check text-emerald-600 dark:text-emerald-400"></i>
+                    </div>
+                    <span class="text-xs font-medium text-emerald-600 dark:text-emerald-400
+                                 bg-emerald-50 dark:bg-emerald-900/30 px-2 py-0.5 rounded-full">
+                        Reçu
+                    </span>
+                </div>
+                <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">
+                    Total Encaissé
+                </p>
+                <p class="text-2xl font-bold text-gray-900 dark:text-white tabular-nums">
+                    {{ number_format($stats->total_encaisse ?? 0, 0, ',', ' ') }}
+                    <span class="text-sm font-medium text-gray-400">DA</span>
+                </p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                    {{ number_format($paidInvoices, 0, ',', ' ') }} factures soldées
+                </p>
+            </div>
+        </div>
+
+        {{-- Reste à Payer --}}
+        <div class="group bg-white dark:bg-gray-800 rounded-2xl border border-gray-200
+                    dark:border-gray-700 p-5 shadow-sm hover:shadow-md transition-shadow
+                    relative overflow-hidden">
+            <div class="absolute inset-0 bg-gradient-to-br from-red-50 to-transparent
+                        dark:from-red-900/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+            <div class="relative">
+                <div class="flex items-start justify-between mb-4">
+                    <div class="w-11 h-11 bg-red-100 dark:bg-red-900/40 rounded-xl
+                                flex items-center justify-center">
+                        <i class="fa-solid fa-clock text-red-600 dark:text-red-400"></i>
+                    </div>
+                    <span class="text-xs font-medium text-red-600 dark:text-red-400
+                                 bg-red-50 dark:bg-red-900/30 px-2 py-0.5 rounded-full">
+                        En cours
+                    </span>
+                </div>
+                <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">
+                    Reste à Payer
+                </p>
+                <p class="text-2xl font-bold text-gray-900 dark:text-white tabular-nums">
+                    {{ number_format($stats->total_impayes ?? 0, 0, ',', ' ') }}
+                    <span class="text-sm font-medium text-gray-400">DA</span>
+                </p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                    {{ number_format($unpaidInvoices, 0, ',', ' ') }} factures impayées
+                </p>
+            </div>
+        </div>
+
+        {{-- Taux de Recouvrement --}}
+        <div class="group bg-white dark:bg-gray-800 rounded-2xl border border-gray-200
+                    dark:border-gray-700 p-5 shadow-sm hover:shadow-md transition-shadow
+                    relative overflow-hidden">
+            <div class="absolute inset-0 bg-gradient-to-br from-amber-50 to-transparent
+                        dark:from-amber-900/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+            <div class="relative">
+                <div class="flex items-start justify-between mb-4">
+                    <div class="w-11 h-11 bg-amber-100 dark:bg-amber-900/40 rounded-xl
+                                flex items-center justify-center">
+                        <i class="fa-solid fa-chart-pie text-amber-600 dark:text-amber-400"></i>
+                    </div>
+                    <span class="text-xs font-medium
+                                 {{ $recoveryRate >= 75 ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/30' : ($recoveryRate >= 50 ? 'text-amber-600 bg-amber-50 dark:bg-amber-900/30' : 'text-red-600 bg-red-50 dark:bg-red-900/30') }}
+                                 px-2 py-0.5 rounded-full">
+                        {{ $recoveryRate >= 75 ? 'Bon' : ($recoveryRate >= 50 ? 'Moyen' : 'Faible') }}
+                    </span>
+                </div>
+                <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">
+                    Taux Recouvrement
+                </p>
+                <p class="text-2xl font-bold text-gray-900 dark:text-white tabular-nums">
+                    {{ number_format($recoveryRate, 1) }}
+                    <span class="text-sm font-medium text-gray-400">%</span>
+                </p>
+                <div class="mt-3">
+                    <div class="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-1.5">
+                        <div class="h-1.5 rounded-full transition-all duration-1000
+                                    {{ $recoveryRate >= 75 ? 'bg-emerald-500' : ($recoveryRate >= 50 ? 'bg-amber-500' : 'bg-red-500') }}"
+                             style="width: {{ min($recoveryRate, 100) }}%"></div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Second Row Stats -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <!-- Clients -->
-        <div class="bg-white rounded-lg shadow-md border border-gray-100 p-6">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-bold text-gray-800">Utilisateurs</h3>
-                <i class="fa-solid fa-users text-2xl text-purple-500"></i>
+    {{-- ── Graphiques ───────────────────────────────────────────────────────── --}}
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-8">
+
+        {{-- Évolution paiements — 12 mois --}}
+        <div class="lg:col-span-2 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200
+                    dark:border-gray-700 p-6 shadow-sm">
+            <div class="flex items-center justify-between mb-6">
+                <div>
+                    <h3 class="text-base font-bold text-gray-900 dark:text-white">
+                        Évolution des encaissements
+                    </h3>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">12 derniers mois</p>
+                </div>
+                <div class="flex items-center gap-1.5">
+                    <span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+                    <span class="text-xs text-gray-500 dark:text-gray-400">Montant (DA)</span>
+                </div>
             </div>
-            <div class="space-y-3">
-                <div class="flex justify-between items-center">
-                    <span class="text-gray-600">Total</span>
-                    <span class="font-bold text-gray-800">{{ $totalUsers }}</span>
-                </div>
-                <div class="flex justify-between items-center">
-                    <span class="text-gray-600">Administrateurs</span>
-                    <span class="font-bold text-blue-600">{{ $totalAdmins }}</span>
-                </div>
-                <div class="flex justify-between items-center">
-                    <span class="text-gray-600">Clients</span>
-                    <span class="font-bold text-green-600">{{ $totalClientUsers }}</span>
-                </div>
+            <div class="h-56">
+                <canvas id="chartPaiements"
+                        data-labels='@json($moisLabels)'
+                        data-amounts='@json($moisAmounts)'></canvas>
             </div>
         </div>
 
-        <!-- Factures Stats -->
-        <div class="bg-white rounded-lg shadow-md border border-gray-100 p-6">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-bold text-gray-800">Factures</h3>
-                <i class="fa-solid fa-file-invoice text-2xl text-blue-500"></i>
+        {{-- Donut statut factures --}}
+        <div class="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200
+                    dark:border-gray-700 p-6 shadow-sm">
+            <div class="mb-6">
+                <h3 class="text-base font-bold text-gray-900 dark:text-white">
+                    Statut des factures
+                </h3>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Répartition globale</p>
             </div>
-            <div class="space-y-3">
-                <div class="flex justify-between items-center">
-                    <span class="text-gray-600">Total</span>
-                    <span class="font-bold text-gray-800">{{ $totalInvoices }}</span>
+            <div class="h-44 relative">
+                <canvas id="chartDonut"
+                        data-paid="{{ $paidInvoices }}"
+                        data-unpaid="{{ $unpaidInvoices }}"
+                        data-canceled="{{ $canceledInvoices }}"></canvas>
+            </div>
+            <div class="mt-4 space-y-2">
+                <div class="flex items-center justify-between text-xs">
+                    <span class="flex items-center gap-2">
+                        <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                        <span class="text-gray-600 dark:text-gray-400">Payées</span>
+                    </span>
+                    <span class="font-semibold text-gray-800 dark:text-gray-200 tabular-nums">
+                        {{ number_format($paidInvoices, 0, ',', ' ') }}
+                    </span>
                 </div>
-                <div class="flex justify-between items-center">
-                    <span class="text-gray-600">Payées</span>
-                    <span class="font-bold text-green-600">{{ $paidInvoices }} <span class="text-xs text-gray-500">({{ $totalInvoices > 0 ? round(($paidInvoices / $totalInvoices) * 100) : 0 }}%)</span></span>
+                <div class="flex items-center justify-between text-xs">
+                    <span class="flex items-center gap-2">
+                        <span class="w-2.5 h-2.5 rounded-full bg-orange-400"></span>
+                        <span class="text-gray-600 dark:text-gray-400">Impayées</span>
+                    </span>
+                    <span class="font-semibold text-gray-800 dark:text-gray-200 tabular-nums">
+                        {{ number_format($unpaidInvoices, 0, ',', ' ') }}
+                    </span>
                 </div>
-                <div class="flex justify-between items-center">
-                    <span class="text-gray-600">Impayées</span>
-                    <span class="font-bold text-red-600">{{ $unpaidInvoices }} <span class="text-xs text-gray-500">({{ $totalInvoices > 0 ? round(($unpaidInvoices / $totalInvoices) * 100) : 0 }}%)</span></span>
+                <div class="flex items-center justify-between text-xs">
+                    <span class="flex items-center gap-2">
+                        <span class="w-2.5 h-2.5 rounded-full bg-gray-300"></span>
+                        <span class="text-gray-600 dark:text-gray-400">Annulées</span>
+                    </span>
+                    <span class="font-semibold text-gray-800 dark:text-gray-200 tabular-nums">
+                        {{ number_format($canceledInvoices, 0, ',', ' ') }}
+                    </span>
                 </div>
-            </div>
-        </div>
-
-        <!-- Quick Links -->
-        <div class="bg-white rounded-lg shadow-md border border-gray-100 p-6">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-bold text-gray-800">Actions Rapides</h3>
-                <i class="fa-solid fa-bolt text-2xl text-yellow-500"></i>
-            </div>
-            <div class="space-y-2">
-                <a href="{{ route('admin.clients.create') }}" class="block px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-sm font-medium transition">
-                    <i class="fa-solid fa-plus mr-2"></i> Nouveau Client
-                </a>
-                <a href="{{ route('admin.imports.index') }}" class="block px-4 py-2 bg-green-50 hover:bg-green-100 text-green-700 rounded-lg text-sm font-medium transition">
-                    <i class="fa-solid fa-upload mr-2"></i> Importer Factures
-                </a>
-                <a href="{{ route('admin.clients.index') }}" class="block px-4 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg text-sm font-medium transition">
-                    <i class="fa-solid fa-list mr-2"></i> Gérer Clients
-                </a>
-            </div>
-        </div>
-    </div>
-
-    <!-- Charts Row -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <!-- Évolution des Paiements -->
-        <div class="bg-white rounded-lg shadow-md border border-gray-100 p-6">
-            <h3 class="text-lg font-bold text-gray-800 mb-4">Évolution des Paiements (6 mois)</h3>
-            <div class="chart-container">
-                <canvas id="paymentChart" data-labels='@json($labels)' data-amounts='@json($amounts)'></canvas>
-            </div>
-        </div>
-
-        <!-- Statut Factures -->
-        <div class="bg-white rounded-lg shadow-md border border-gray-100 p-6">
-            <h3 class="text-lg font-bold text-gray-800 mb-4">Statut des Factures</h3>
-            <div class="chart-container">
-                <canvas id="invoiceStatusChart" data-paid="{{ $paidInvoices }}" data-unpaid="{{ $unpaidInvoices }}"></canvas>
             </div>
         </div>
     </div>
 
-    <!-- Debtors and Payers -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <!-- Top Débiteurs -->
-        <div class="bg-white rounded-lg shadow-md border border-gray-100 p-6">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-bold text-gray-800">Top 5 Clients Débiteurs</h3>
-                <i class="fa-solid fa-triangle-exclamation text-red-500"></i>
+    {{-- ── Top Débiteurs + Payeurs ─────────────────────────────────────────── --}}
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-8">
+
+        {{-- Top débiteurs --}}
+        <div class="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200
+                    dark:border-gray-700 shadow-sm overflow-hidden">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100
+                        dark:border-gray-700">
+                <h3 class="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                    <i class="fa-solid fa-triangle-exclamation text-red-500"></i>
+                    Top 5 Débiteurs
+                </h3>
+                <a href="{{ route('admin.clients.index') }}"
+                   class="text-xs text-blue-600 dark:text-blue-400 hover:underline">
+                    Voir tout →
+                </a>
+            </div>
+            <div class="divide-y divide-gray-50 dark:divide-gray-700/50">
+                @forelse($topDebiteurs as $i => $client)
+                @php
+                    $montant = $client->factures_sum_reste_a_payer ?? 0;
+                    $maxMontant = $topDebiteurs->first()->factures_sum_reste_a_payer ?? 1;
+                    $pct = $maxMontant > 0 ? ($montant / $maxMontant) * 100 : 0;
+                @endphp
+                <div class="px-6 py-3.5 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
+                    <div class="flex items-center gap-3">
+                        <span class="w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold
+                                     {{ $i === 0 ? 'bg-red-100 text-red-600' : 'bg-gray-100 dark:bg-gray-700 text-gray-500' }}">
+                            {{ $i + 1 }}
+                        </span>
+                        <div class="flex-1 min-w-0">
+                            <a href="{{ route('admin.clients.show', $client) }}"
+                               class="text-sm font-medium text-gray-800 dark:text-gray-200
+                                      hover:text-blue-600 dark:hover:text-blue-400 truncate block">
+                                {{ $client->name }}
+                            </a>
+                            <div class="flex items-center gap-2 mt-1">
+                                <div class="flex-1 bg-gray-100 dark:bg-gray-700 rounded-full h-1">
+                                    <div class="h-1 rounded-full bg-red-400"
+                                         style="width: {{ $pct }}%"></div>
+                                </div>
+                                <span class="text-xs font-bold text-red-600 dark:text-red-400
+                                             tabular-nums whitespace-nowrap">
+                                    {{ number_format($montant, 0, ',', ' ') }} DA
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                @empty
+                <div class="px-6 py-10 text-center">
+                    <i class="fa-solid fa-circle-check text-3xl text-emerald-300 mb-2 block"></i>
+                    <p class="text-sm text-gray-400 dark:text-gray-500">Aucun débiteur</p>
+                </div>
+                @endforelse
+            </div>
+        </div>
+
+        {{-- Top payeurs --}}
+        <div class="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200
+                    dark:border-gray-700 shadow-sm overflow-hidden">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100
+                        dark:border-gray-700">
+                <h3 class="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                    <i class="fa-solid fa-star text-amber-500"></i>
+                    Top 5 Payeurs
+                </h3>
+                <a href="{{ route('admin.clients.index') }}"
+                   class="text-xs text-blue-600 dark:text-blue-400 hover:underline">
+                    Voir tout →
+                </a>
+            </div>
+            <div class="divide-y divide-gray-50 dark:divide-gray-700/50">
+                @forelse($topPayeurs as $i => $client)
+                @php
+                    $montant = $client->montant_paye_total ?? 0;
+                    $maxMontant = $topPayeurs->first()->montant_paye_total ?? 1;
+                    $pct = $maxMontant > 0 ? ($montant / $maxMontant) * 100 : 0;
+                @endphp
+                <div class="px-6 py-3.5 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
+                    <div class="flex items-center gap-3">
+                        <span class="w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold
+                                     {{ $i === 0 ? 'bg-amber-100 text-amber-600' : 'bg-gray-100 dark:bg-gray-700 text-gray-500' }}">
+                            {{ $i + 1 }}
+                        </span>
+                        <div class="flex-1 min-w-0">
+                            <a href="{{ route('admin.clients.show', $client) }}"
+                               class="text-sm font-medium text-gray-800 dark:text-gray-200
+                                      hover:text-blue-600 dark:hover:text-blue-400 truncate block">
+                                {{ $client->name }}
+                            </a>
+                            <div class="flex items-center gap-2 mt-1">
+                                <div class="flex-1 bg-gray-100 dark:bg-gray-700 rounded-full h-1">
+                                    <div class="h-1 rounded-full bg-emerald-400"
+                                         style="width: {{ $pct }}%"></div>
+                                </div>
+                                <span class="text-xs font-bold text-emerald-600 dark:text-emerald-400
+                                             tabular-nums whitespace-nowrap">
+                                    {{ number_format($montant, 0, ',', ' ') }} DA
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                @empty
+                <div class="px-6 py-10 text-center">
+                    <i class="fa-solid fa-inbox text-3xl text-gray-200 mb-2 block"></i>
+                    <p class="text-sm text-gray-400 dark:text-gray-500">Aucun paiement</p>
+                </div>
+                @endforelse
+            </div>
+        </div>
+    </div>
+
+    {{-- ── Activité récente ─────────────────────────────────────────────────── --}}
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-8">
+
+        {{-- Factures récentes --}}
+        <div class="lg:col-span-2 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200
+                    dark:border-gray-700 shadow-sm overflow-hidden">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100
+                        dark:border-gray-700">
+                <h3 class="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                    <i class="fa-solid fa-file-invoice text-blue-500"></i>
+                    Factures Récentes
+                </h3>
+                <a href="{{ route('admin.factures.index') }}"
+                   class="text-xs text-blue-600 dark:text-blue-400 hover:underline">
+                    Voir tout →
+                </a>
             </div>
             <div class="overflow-x-auto">
-                <table class="w-full text-sm">
-                    <thead>
-                        <tr class="border-b border-gray-200 text-xs text-gray-600 uppercase font-semibold">
-                            <th class="pb-3 text-left">Client</th>
-                            <th class="pb-3 text-right">Reste à Payer</th>
+                <table class="w-full text-xs">
+                    <thead class="bg-gray-50 dark:bg-gray-700/50">
+                        <tr class="text-gray-500 dark:text-gray-400 uppercase tracking-wide font-semibold">
+                            <th class="px-5 py-2.5 text-left">N° Facture</th>
+                            <th class="px-5 py-2.5 text-left">Client</th>
+                            <th class="px-5 py-2.5 text-left hidden sm:table-cell">Date</th>
+                            <th class="px-5 py-2.5 text-right">Montant TTC</th>
+                            <th class="px-5 py-2.5 text-center">Statut</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        @forelse($topDebiteurs as $index => $client)
-                        <tr class="border-b border-gray-100 hover:bg-gray-50 transition">
-                            <td class="py-3">
-                                <div class="flex items-center gap-2">
-                                    <span class="w-6 h-6 bg-red-100 text-red-600 rounded-full flex items-center justify-center font-bold text-xs">{{ $index + 1 }}</span>
-                                    <a href="{{ route('admin.clients.show', $client) }}" class="font-medium text-gray-800 hover:text-blue-600">{{ $client->name }}</a>
-                                </div>
+                    <tbody class="divide-y divide-gray-50 dark:divide-gray-700/50">
+                        @forelse($recentInvoices as $inv)
+                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
+                            <td class="px-5 py-3">
+                                <a href="{{ route('admin.factures.show', $inv) }}"
+                                   class="font-mono font-semibold text-blue-600 dark:text-blue-400
+                                          hover:underline">
+                                    {{ $inv->numero_facture }}
+                                </a>
                             </td>
-                            <td class="py-3 text-right text-red-600 font-bold">{{ number_format($client->factures_sum_reste_a_payer ?? 0, 0, ',', ' ') }} DA</td>
+                            <td class="px-5 py-3 text-gray-700 dark:text-gray-300 max-w-[160px] truncate">
+                                {{ $inv->client?->name ?? '—' }}
+                            </td>
+                            <td class="px-5 py-3 text-gray-500 dark:text-gray-400 tabular-nums hidden sm:table-cell">
+                                {{ $inv->date_facture?->format('d/m/Y') ?? '—' }}
+                            </td>
+                            <td class="px-5 py-3 text-right font-semibold text-gray-800
+                                       dark:text-gray-200 tabular-nums">
+                                {{ number_format($inv->total_ttc, 0, ',', ' ') }} DA
+                            </td>
+                            <td class="px-5 py-3 text-center">
+                                @if($inv->reste_a_payer <= 0)
+                                    <span class="inline-flex items-center gap-1 bg-emerald-100 text-emerald-700
+                                                 dark:bg-emerald-900/40 dark:text-emerald-300
+                                                 px-2 py-0.5 rounded-full text-[10px] font-semibold">
+                                        <i class="fa-solid fa-circle-check text-[8px]"></i> Payée
+                                    </span>
+                                @else
+                                    <span class="inline-flex items-center gap-1 bg-orange-100 text-orange-700
+                                                 dark:bg-orange-900/40 dark:text-orange-300
+                                                 px-2 py-0.5 rounded-full text-[10px] font-semibold">
+                                        <i class="fa-solid fa-clock text-[8px]"></i> Impayée
+                                    </span>
+                                @endif
+                            </td>
                         </tr>
                         @empty
                         <tr>
-                            <td colspan="2" class="py-6 text-center text-gray-500">
-                                <i class="fa-solid fa-inbox text-2xl opacity-50"></i>
-                                <p class="mt-2">Aucun débiteur</p>
+                            <td colspan="5" class="px-5 py-10 text-center text-gray-400 dark:text-gray-500">
+                                Aucune facture récente.
                             </td>
                         </tr>
                         @endforelse
@@ -200,187 +436,282 @@
             </div>
         </div>
 
-        <!-- Top Payeurs -->
-        <div class="bg-white rounded-lg shadow-md border border-gray-100 p-6">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-bold text-gray-800">Top 5 Meilleurs Payeurs</h3>
-                <i class="fa-solid fa-star text-yellow-500"></i>
+        {{-- Panneau droite : utilisateurs + imports --}}
+        <div class="flex flex-col gap-5">
+
+            {{-- Stats utilisateurs --}}
+            <div class="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200
+                        dark:border-gray-700 shadow-sm p-5">
+                <h3 class="text-sm font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                    <i class="fa-solid fa-users text-purple-500"></i> Utilisateurs
+                </h3>
+                <div class="space-y-3">
+                    @foreach([
+                        ['label' => 'Total', 'value' => $totalUsers, 'color' => 'text-gray-800 dark:text-gray-200'],
+                        ['label' => 'Administrateurs', 'value' => $totalAdmins, 'color' => 'text-blue-600'],
+                        ['label' => 'Clients', 'value' => $totalClientUsers, 'color' => 'text-emerald-600'],
+                        ['label' => 'Clients enregistrés', 'value' => $totalClients, 'color' => 'text-purple-600'],
+                    ] as $item)
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs text-gray-500 dark:text-gray-400">{{ $item['label'] }}</span>
+                        <span class="text-sm font-bold {{ $item['color'] }} tabular-nums">
+                            {{ number_format($item['value'], 0, ',', ' ') }}
+                        </span>
+                    </div>
+                    @endforeach
+                </div>
             </div>
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm">
-                    <thead>
-                        <tr class="border-b border-gray-200 text-xs text-gray-600 uppercase font-semibold">
-                            <th class="pb-3 text-left">Client</th>
-                            <th class="pb-3 text-right">Total Payé</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse($topPayeurs as $index => $client)
-                        <tr class="border-b border-gray-100 hover:bg-gray-50 transition">
-                            <td class="py-3">
-                                <div class="flex items-center gap-2">
-                                    <span class="w-6 h-6 bg-green-100 text-green-600 rounded-full flex items-center justify-center font-bold text-xs">{{ $index + 1 }}</span>
-                                    <a href="{{ route('admin.clients.show', $client) }}" class="font-medium text-gray-800 hover:text-blue-600">{{ $client->name }}</a>
-                                </div>
-                            </td>
-                            <td class="py-3 text-right text-green-600 font-bold">{{ number_format($client->factures_sum_montant_paye ?? 0, 0, ',', ' ') }} DA</td>
-                        </tr>
-                        @empty
-                        <tr>
-                            <td colspan="2" class="py-6 text-center text-gray-500">
-                                <i class="fa-solid fa-inbox text-2xl opacity-50"></i>
-                                <p class="mt-2">Aucun paiement</p>
-                            </td>
-                        </tr>
-                        @endforelse
-                    </tbody>
-                </table>
+
+            {{-- Derniers imports --}}
+            <div class="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200
+                        dark:border-gray-700 shadow-sm p-5 flex-1">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                        <i class="fa-solid fa-upload text-teal-500"></i> Derniers Imports
+                    </h3>
+                    <a href="{{ route('admin.imports.index') }}"
+                       class="text-xs text-blue-600 dark:text-blue-400 hover:underline">
+                        Voir tout →
+                    </a>
+                </div>
+                <div class="space-y-2.5">
+                    @forelse($recentImports as $imp)
+                    @php
+                        $typeColors = [
+                            'factures'           => 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
+                            'prestations'        => 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300',
+                            'paiements'          => 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+                            'factures_payees'    => 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
+                            'prestations_payees' => 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',
+                        ];
+                        $statusColors = [
+                            'completed'  => 'text-emerald-600',
+                            'processing' => 'text-blue-500',
+                            'failed'     => 'text-red-500',
+                            'pending'    => 'text-gray-400',
+                        ];
+                        $statusIcons = [
+                            'completed'  => 'fa-circle-check',
+                            'processing' => 'fa-spinner fa-spin',
+                            'failed'     => 'fa-circle-xmark',
+                            'pending'    => 'fa-clock',
+                        ];
+                    @endphp
+                    <div class="flex items-center gap-2.5">
+                        <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold flex-shrink-0
+                                     {{ $typeColors[$imp->type] ?? 'bg-gray-100 text-gray-600' }}">
+                            {{ Str::limit($imp->type, 10) }}
+                        </span>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-xs text-gray-600 dark:text-gray-400 truncate">
+                                {{ $imp->original_filename }}
+                            </p>
+                            <p class="text-[10px] text-gray-400 dark:text-gray-500 tabular-nums">
+                                {{ $imp->created_at->diffForHumans() }}
+                            </p>
+                        </div>
+                        <i class="fa-solid {{ $statusIcons[$imp->status] ?? 'fa-question' }}
+                                  text-xs {{ $statusColors[$imp->status] ?? 'text-gray-400' }}
+                                  flex-shrink-0"></i>
+                    </div>
+                    @empty
+                    <p class="text-xs text-gray-400 dark:text-gray-500 text-center py-4">
+                        Aucun import récent.
+                    </p>
+                    @endforelse
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- Recent Activities -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <!-- Recent Invoices -->
-        <div class="bg-white rounded-lg shadow-md border border-gray-100 p-6">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-bold text-gray-800">Factures Récentes</h3>
-                <a href="{{ route('admin.factures.index') }}" class="text-sm text-blue-600 hover:text-blue-800">Voir tout →</a>
-            </div>
-            <div class="space-y-3">
-                @forelse($recentInvoices as $invoice)
-                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
-                    <div class="flex-1">
-                        <p class="font-semibold text-gray-800">{{ $invoice->numero_facture }}</p>
-                        <p class="text-xs text-gray-600">{{ $invoice->client->name }}</p>
-                    </div>
-                    <div class="text-right">
-                        <p class="font-bold text-gray-800">{{ number_format($invoice->total_ttc, 0, ',', ' ') }} DA</p>
-                        <p class="text-xs {{ $invoice->reste_a_payer <= 0 ? 'text-green-600' : 'text-red-600' }}">
-                            {{ $invoice->reste_a_payer <= 0 ? '✓ Payée' : 'Impayée' }}
-                        </p>
-                    </div>
-                </div>
-                @empty
-                <p class="text-center text-gray-500 py-6">Aucune facture récente</p>
-                @endforelse
-            </div>
+    {{-- ── Paiements récents ────────────────────────────────────────────────── --}}
+    <div class="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200
+                dark:border-gray-700 shadow-sm overflow-hidden">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100
+                    dark:border-gray-700">
+            <h3 class="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <i class="fa-solid fa-coins text-emerald-500"></i>
+                Paiements Récents
+            </h3>
+            <a href="{{ route('admin.paiements.index') }}"
+               class="text-xs text-blue-600 dark:text-blue-400 hover:underline">
+                Voir tout →
+            </a>
         </div>
-
-        <!-- Recent Payments -->
-        <div class="bg-white rounded-lg shadow-md border border-gray-100 p-6">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-bold text-gray-800">Paiements Récents</h3>
-                <a href="{{ route('admin.paiements.index') }}" class="text-sm text-blue-600 hover:text-blue-800">Voir tout →</a>
-            </div>
-            <div class="space-y-3">
-                @forelse($recentPayments as $payment)
-                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
-                    <div class="flex-1">
-                        <p class="font-semibold text-gray-800">{{ $payment->facture->numero_facture ?? 'N/A' }}</p>
-                        <p class="text-xs text-gray-600">{{ $payment->facture->client->name ?? 'Client' }}</p>
-                    </div>
-                    <div class="text-right">
-                        <p class="font-bold text-green-600">+ {{ number_format($payment->montant, 0, ',', ' ') }} DA</p>
-                        <p class="text-xs text-gray-500">{{ $payment->date_paiement }}</p>
-                    </div>
-                </div>
-                @empty
-                <p class="text-center text-gray-500 py-6">Aucun paiement récent</p>
-                @endforelse
-            </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-xs">
+                <thead class="bg-gray-50 dark:bg-gray-700/50">
+                    <tr class="text-gray-500 dark:text-gray-400 uppercase tracking-wide font-semibold">
+                        <th class="px-5 py-2.5 text-left">N° Facture</th>
+                        <th class="px-5 py-2.5 text-left hidden sm:table-cell">Client</th>
+                        <th class="px-5 py-2.5 text-left hidden md:table-cell">N° Reçu</th>
+                        <th class="px-5 py-2.5 text-left hidden md:table-cell">Banque</th>
+                        <th class="px-5 py-2.5 text-right">Montant</th>
+                        <th class="px-5 py-2.5 text-right hidden sm:table-cell">Date</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-50 dark:divide-gray-700/50">
+                    @forelse($recentPayments as $pay)
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
+                        <td class="px-5 py-3">
+                            <span class="font-mono font-semibold text-gray-700 dark:text-gray-300">
+                                {{ $pay->facture?->numero_facture ?? '—' }}
+                            </span>
+                        </td>
+                        <td class="px-5 py-3 text-gray-600 dark:text-gray-400 max-w-[140px] truncate hidden sm:table-cell">
+                            {{ $pay->facture?->client?->name ?? '—' }}
+                        </td>
+                        <td class="px-5 py-3 text-gray-500 dark:text-gray-400 tabular-nums hidden md:table-cell">
+                            {{ $pay->recu ?? '—' }}
+                        </td>
+                        <td class="px-5 py-3 text-gray-500 dark:text-gray-400 hidden md:table-cell">
+                            {{ $pay->banque ?? '—' }}
+                        </td>
+                        <td class="px-5 py-3 text-right">
+                            <span class="font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                                + {{ number_format($pay->montant, 0, ',', ' ') }} DA
+                            </span>
+                        </td>
+                        <td class="px-5 py-3 text-right text-gray-400 dark:text-gray-500 tabular-nums hidden sm:table-cell">
+                            {{ $pay->date_paiement ?? '—' }}
+                        </td>
+                    </tr>
+                    @empty
+                    <tr>
+                        <td colspan="6" class="px-5 py-10 text-center text-gray-400 dark:text-gray-500">
+                            Aucun paiement récent.
+                        </td>
+                    </tr>
+                    @endforelse
+                </tbody>
+            </table>
         </div>
     </div>
+
 </div>
 
+
 <script>
-    document.addEventListener("DOMContentLoaded", () => {
-        // Set recovery bar width
-        const recoveryBars = document.querySelectorAll('.recovery-bar');
-        recoveryBars.forEach(bar => {
-            const width = bar.dataset.width;
-            bar.style.width = width + '%';
-        });
+document.addEventListener('DOMContentLoaded', function () {
 
-        // Payment Chart (Line)
-        const paymentCanvas = document.getElementById('paymentChart');
-        if (paymentCanvas) {
-            new Chart(paymentCanvas, {
-                type: 'line',
-                data: {
-                    labels: JSON.parse(paymentCanvas.dataset.labels),
-                    datasets: [{
-                        label: 'Paiements Reçus (DA)',
-                        data: JSON.parse(paymentCanvas.dataset.amounts),
-                        borderColor: '#3b82f6',
-                        backgroundColor: 'rgba(59, 130, 244, 0.1)',
-                        borderWidth: 3,
-                        fill: true,
-                        tension: 0.4,
-                        pointRadius: 6,
-                        pointBackgroundColor: '#3b82f6',
-                        pointBorderColor: '#fff',
-                        pointBorderWidth: 2,
-                        pointHoverRadius: 8
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: true,
-                            position: 'top'
-                        }
+    const isDark = document.documentElement.classList.contains('dark');
+    const gridColor  = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+    const textColor  = isDark ? '#9ca3af' : '#6b7280';
+    const tooltipBg  = isDark ? '#1f2937' : '#ffffff';
+    const tooltipTxt = isDark ? '#f3f4f6' : '#111827';
+
+    // ── Graphique ligne — encaissements 12 mois ───────────────────────────
+    const canvasPaiements = document.getElementById('chartPaiements');
+    if (canvasPaiements) {
+        const labels  = JSON.parse(canvasPaiements.dataset.labels);
+        const amounts = JSON.parse(canvasPaiements.dataset.amounts);
+
+        new Chart(canvasPaiements, {
+            type: 'line',
+            data: {
+                labels,
+                datasets: [{
+                    label: 'Encaissements (DA)',
+                    data: amounts,
+                    borderColor: '#3b82f6',
+                    backgroundColor: (ctx) => {
+                        const gradient = ctx.chart.ctx.createLinearGradient(0, 0, 0, 200);
+                        gradient.addColorStop(0, 'rgba(59,130,246,0.25)');
+                        gradient.addColorStop(1, 'rgba(59,130,246,0)');
+                        return gradient;
                     },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: {
-                                callback: function(value) {
-                                    return value.toLocaleString('fr-FR') + ' DA';
-                                }
-                            }
+                    borderWidth: 2.5,
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 4,
+                    pointBackgroundColor: '#3b82f6',
+                    pointBorderColor: isDark ? '#1f2937' : '#ffffff',
+                    pointBorderWidth: 2,
+                    pointHoverRadius: 6,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: tooltipBg,
+                        titleColor: tooltipTxt,
+                        bodyColor: textColor,
+                        borderColor: isDark ? '#374151' : '#e5e7eb',
+                        borderWidth: 1,
+                        padding: 12,
+                        callbacks: {
+                            label: (ctx) => ' ' + ctx.parsed.y.toLocaleString('fr-DZ') + ' DA',
                         }
                     }
-                }
-            });
-        }
-
-        // Invoice Status Chart (Doughnut)
-        const invoiceCanvas = document.getElementById('invoiceStatusChart');
-        if (invoiceCanvas) {
-            new Chart(invoiceCanvas, {
-                type: 'doughnut',
-                data: {
-                    labels: ['Payées', 'Impayées'],
-                    datasets: [{
-                        data: [
-                            parseInt(invoiceCanvas.dataset.paid),
-                            parseInt(invoiceCanvas.dataset.unpaid)
-                        ],
-                        backgroundColor: ['#10b981', '#ef4444'],
-                        borderColor: '#fff',
-                        borderWidth: 2
-                    }]
                 },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'bottom',
-                            labels: {
-                                padding: 15,
-                                font: {
-                                    size: 12
-                                }
+                scales: {
+                    x: {
+                        grid: { color: gridColor, drawBorder: false },
+                        ticks: { color: textColor, font: { size: 11 } },
+                    },
+                    y: {
+                        grid: { color: gridColor, drawBorder: false },
+                        ticks: {
+                            color: textColor,
+                            font: { size: 11 },
+                            callback: (v) => {
+                                if (v >= 1_000_000) return (v/1_000_000).toFixed(1) + 'M';
+                                if (v >= 1_000)     return (v/1_000).toFixed(0) + 'k';
+                                return v;
                             }
+                        },
+                    }
+                }
+            }
+        });
+    }
+
+    // ── Donut — statut factures ───────────────────────────────────────────
+    const canvasDonut = document.getElementById('chartDonut');
+    if (canvasDonut) {
+        const paid     = parseInt(canvasDonut.dataset.paid     || 0);
+        const unpaid   = parseInt(canvasDonut.dataset.unpaid   || 0);
+        const canceled = parseInt(canvasDonut.dataset.canceled || 0);
+
+        new Chart(canvasDonut, {
+            type: 'doughnut',
+            data: {
+                labels: ['Payées', 'Impayées', 'Annulées'],
+                datasets: [{
+                    data: [paid, unpaid, canceled],
+                    backgroundColor: ['#10b981', '#fb923c', '#d1d5db'],
+                    borderColor: isDark ? '#1f2937' : '#ffffff',
+                    borderWidth: 3,
+                    hoverOffset: 6,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '72%',
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: tooltipBg,
+                        titleColor: tooltipTxt,
+                        bodyColor: textColor,
+                        borderColor: isDark ? '#374151' : '#e5e7eb',
+                        borderWidth: 1,
+                        padding: 10,
+                        callbacks: {
+                            label: (ctx) => ' ' + ctx.parsed.toLocaleString('fr-DZ') + ' factures',
                         }
                     }
                 }
-            });
-        }
-    });
+            }
+        });
+    }
+});
 </script>
+
+
 @endsection
