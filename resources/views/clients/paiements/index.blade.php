@@ -26,7 +26,7 @@
                     <th class="p-4 border-b">Facture</th>
                     <th class="p-4 border-b">Référence</th>
                     <th class="p-4 border-b">Banque</th>
-                    <th class="p-4 border-b text-right">Montant</th>
+                    <th class="p-4 text-right border-b ">Montant</th>
                 </tr>
             </thead>
             <tbody class="text-sm">

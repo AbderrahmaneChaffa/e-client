@@ -1,81 +1,126 @@
 <?php
-
+// app/Http/Controllers/Client/DashboardController.php
 namespace App\Http\Controllers\Client;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Support\Facades\Auth;
-use App\Models\Facture;
-use App\Models\Paiement;
-use Illuminate\Support\Facades\DB;
+use App\Models\{Facture, Paiement};
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Auth;
 
 class DashboardController extends Controller
 {
     public function index()
     {
-        $user = Auth::user();
-        $clientId = $user->client_id;
+        $clientId = Auth::user()->client_id;
 
-        // 1. Calcul des totaux en UNE SEULE requête (Optimisation Performance)
-        // On exclut strictement les factures annulées
+        // ── Stats financières (montant_paye n'existe pas) ─────────────────
         $stats = Facture::where('client_id', $clientId)
-            ->where('annuler', false)
+            ->where('annuler', 0)
             ->selectRaw('
-                COUNT(*) as count, 
-                SUM(total_ttc) as total_factured, 
-                SUM(montant_paye) as total_paid, 
-                SUM(reste_a_payer) as total_due
+                COUNT(*)                          AS total_count,
+                SUM(total_ttc)                    AS total_facture,
+                SUM(total_ttc - reste_a_payer)    AS total_paye,
+                SUM(reste_a_payer)                AS total_due,
+                SUM(total_ht)                     AS total_ht,
+                SUM(total_tva)                    AS total_tva
             ')
             ->first();
 
-        // 2. Factures récentes avec relations (Escale par exemple)
-        $recentInvoices = Facture::with('escale') // Eager loading
-            ->where('client_id', $clientId)
-            ->where('annuler', false)
-            ->orderBy('date_facture', 'desc')
-            ->take(5)
-            ->get();
+        $totalFacture = (float) ($stats->total_facture ?? 0);
+        $totalPaye = (float) ($stats->total_paye ?? 0);
+        $totalDue = (float) ($stats->total_due ?? 0);
+        $totalCount = (int) ($stats->total_count ?? 0);
 
-        // 3. Paiements récents
-        $recentPayments = Paiement::whereHas('facture', function ($q) use ($clientId) {
-            $q->where('client_id', $clientId)->where('annuler', false);
-        })
-            ->orderBy('date_paiement', 'desc')
-            ->take(5)
-            ->get();
+        // ── Taux de recouvrement ──────────────────────────────────────────
+        $recoveryRate = $totalFacture > 0
+            ? round(($totalPaye / $totalFacture) * 100, 1)
+            : 0;
 
-        // 4. Données pour le graphique de statut (Donut Chart)
+        // ── Compteurs statuts ─────────────────────────────────────────────
         $paidCount = Facture::where('client_id', $clientId)
-            ->where('annuler', false)
-            ->where('reste_a_payer', '<=', 0)
-            ->count();
+            ->where('annuler', 0)->where('reste_a_payer', '<=', 0)->count();
+        $unpaidCount = Facture::where('client_id', $clientId)
+            ->where('annuler', 0)->where('reste_a_payer', '>', 0)->count();
+        $canceledCount = Facture::where('client_id', $clientId)
+            ->where('annuler', 1)->count();
 
-        $unpaidCount = ($stats->count ?? 0) - $paidCount;
-
-        // 5. Paiements mensuels (6 derniers mois) - Correction du tri par année/mois
-        $monthlyData = Paiement::selectRaw('YEAR(date_paiement) as annee, MONTH(date_paiement) as mois, SUM(montant) as total')
-            ->whereHas('facture', fn($q) => $q->where('client_id', $clientId)->where('annuler', false))
-            ->where('date_paiement', '>=', now()->subMonths(6)->startOfMonth())
-            ->groupBy('annee', 'mois')
-            ->orderBy('annee', 'asc')
-            ->orderBy('mois', 'asc')
+        // ── Graphique mensuel — 12 mois ────────────────────────────────────
+        $monthlyRaw = Paiement::selectRaw('
+                YEAR(date_paiement)  AS annee,
+                MONTH(date_paiement) AS mois,
+                SUM(montant)         AS total,
+                COUNT(*)             AS nb
+            ')
+            ->whereHas(
+                'facture',
+                fn($q) =>
+                $q->where('client_id', $clientId)->where('annuler', 0)
+            )
+            ->whereNotNull('date_paiement')
+            ->where('date_paiement', '>=', now()->subMonths(12)->startOfMonth())
+            ->groupByRaw('YEAR(date_paiement), MONTH(date_paiement)')
+            ->orderByRaw('YEAR(date_paiement), MONTH(date_paiement)')
             ->get();
 
-        $labels = $monthlyData->map(function ($d) {
-            return Carbon::create($d->annee, $d->mois, 1)->translatedFormat('M Y');
-        });
-        $amounts = $monthlyData->pluck('total');
+        $moisLabels = [];
+        $moisAmounts = [];
 
-        return view('clients.dashboard', [
-            'totalInvoices'    => $stats->count ?? 0,
-            'totalFactured'    => $stats->total_factured ?? 0,
-            'totalPaid'        => $stats->total_paid ?? 0,
-            'totalDue'         => $stats->total_due ?? 0,
-            'recentInvoices'   => $recentInvoices,
-            'recentPayments'   => $recentPayments,
-            'invoiceChartData' => ['paid' => $paidCount, 'unpaid' => $unpaidCount],
-            'labels'           => $labels,
-            'amounts'          => $amounts,
-        ]);
+        for ($i = 11; $i >= 0; $i--) {
+            $date = now()->subMonths($i);
+            $annee = (int) $date->format('Y');
+            $mois = (int) $date->format('n');
+
+            $found = $monthlyRaw->first(
+                fn($d) => (int) $d->annee === $annee && (int) $d->mois === $mois
+            );
+
+            $moisLabels[] = $date->locale('fr')->isoFormat('MMM YY');
+            $moisAmounts[] = $found ? (float) $found->total : 0;
+        }
+
+        // ── Factures récentes ─────────────────────────────────────────────
+        $recentInvoices = Facture::with('escale')
+            ->where('client_id', $clientId)
+            ->where('annuler', 0)
+            ->orderByDesc('date_facture')
+            ->take(6)
+            ->get();
+
+        // ── Paiements récents ─────────────────────────────────────────────
+        $recentPayments = Paiement::with('facture')
+            ->whereHas(
+                'facture',
+                fn($q) =>
+                $q->where('client_id', $clientId)->where('annuler', 0)
+            )
+            ->whereNotNull('date_paiement')
+            ->orderByDesc('date_paiement')
+            ->take(6)
+            ->get();
+
+        // ── Factures impayées les plus anciennes (alertes) ────────────────
+        $facturesEnRetard = Facture::where('client_id', $clientId)
+            ->where('annuler', 0)
+            ->where('reste_a_payer', '>', 0)
+            ->orderBy('date_facture')
+            ->take(5)
+            ->get();
+
+        return view('clients.dashboard', compact(
+            'totalCount',
+            'totalFacture',
+            'totalPaye',
+            'totalDue',
+            'recoveryRate',
+            'paidCount',
+            'unpaidCount',
+            'canceledCount',
+            'moisLabels',
+            'moisAmounts',
+            'recentInvoices',
+            'recentPayments',
+            'facturesEnRetard',
+            'stats'
+        ));
     }
 }
