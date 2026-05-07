@@ -7,12 +7,14 @@ use App\Helpers\NumberHelper;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema;
 
 class FactureController extends Controller
 {
     public function index(Request $request)
     {
         $query = Facture::with(['client', 'escale.navire']);
+        $hasVerificationColumns = Schema::hasColumn('factures', 'verification_status');
 
         // ── Filtres ──────────────────────────────────────────────────────────
         if ($request->filled('numero')) {
@@ -29,6 +31,16 @@ class FactureController extends Controller
                 'impaye'  => $query->where('annuler', 0)->where('reste_a_payer', '>', 0),
                 'annulee' => $query->where('annuler', 1),
                 default   => null,
+            };
+        }
+
+        if ($hasVerificationColumns && $request->filled('verification')) {
+            match($request->verification) {
+                'anomalies' => $query->whereIn('verification_status', ['warning', 'critical']),
+                'critical' => $query->where('verification_status', 'critical'),
+                'warning' => $query->where('verification_status', 'warning'),
+                'ok' => $query->where('verification_status', 'ok'),
+                default => null,
             };
         }
 
@@ -59,6 +71,15 @@ class FactureController extends Controller
         if ($request->filled('client_id')) {
             $statsQuery->where('client_id', $request->client_id);
         }
+        if ($hasVerificationColumns && $request->filled('verification')) {
+            match($request->verification) {
+                'anomalies' => $statsQuery->whereIn('verification_status', ['warning', 'critical']),
+                'critical' => $statsQuery->where('verification_status', 'critical'),
+                'warning' => $statsQuery->where('verification_status', 'warning'),
+                'ok' => $statsQuery->where('verification_status', 'ok'),
+                default => null,
+            };
+        }
         if ($request->filled('date_from')) {
             $statsQuery->whereDate('date_facture', '>=', $request->date_from);
         }
@@ -73,6 +94,8 @@ class FactureController extends Controller
             'count_payees'   => (clone $statsQuery)->where('annuler', 0)->where('reste_a_payer', '<=', 0)->count(),
             'count_impayees' => (clone $statsQuery)->where('annuler', 0)->where('reste_a_payer', '>', 0)->count(),
             'count_annulees' => (clone $statsQuery)->where('annuler', 1)->count(),
+            'count_anomalies' => $hasVerificationColumns ? (clone $statsQuery)->whereIn('verification_status', ['warning', 'critical'])->count() : 0,
+            'count_critical' => $hasVerificationColumns ? (clone $statsQuery)->where('verification_status', 'critical')->count() : 0,
         ];
 
         $clients = Client::select('id', 'name')->orderBy('name')->get();

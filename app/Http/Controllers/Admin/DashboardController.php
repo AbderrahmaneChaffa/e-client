@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\{Client, Facture, ImportBatch, Paiement, User};
+use App\Services\ImportVerificationService;
 use Illuminate\Support\Facades\{Cache, DB};
 
 class DashboardController extends Controller
@@ -160,6 +161,8 @@ class DashboardController extends Controller
             'clients' => Client::where('created_at', '>=', now()->startOfWeek())->count(),
         ];
 
+        $dataHealth = app(ImportVerificationService::class)->latestHealthSummary();
+
         return view('admins.dashboard', compact(
             'stats',
             'totalClients',
@@ -181,7 +184,8 @@ class DashboardController extends Controller
             'recentImports',
             'recentInvoices',
             'recentPayments',
-            'weekStats'
+            'weekStats',
+            'dataHealth'
         ));
     }
 }

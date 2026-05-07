@@ -20,7 +20,7 @@
                     <h2 class="text-lg font-semibold text-gray-900 flex items-center gap-2">
                         <i class="fa-solid fa-filter text-blue-600"></i> Filtres et Recherche
                     </h2>
-                    @if(request()->hasAny(['numero', 'client_id', 'statut', 'search']))
+                    @if(request()->hasAny(['numero', 'client_id', 'statut', 'verification', 'search']))
                         <a href="{{ route('admin.factures.index') }}"
                             class="text-sm text-gray-500 hover:text-gray-700 font-medium">
                             <i class="fa-solid fa-times mr-1"></i> Réinitialiser
@@ -29,7 +29,7 @@
                 </div>
 
                 <form method="GET" action="{{ route('admin.factures.index') }}" class="space-y-4 md:space-y-0">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
                         <!-- Search by number -->
                         <div class="relative">
                             <label class="block text-xs font-semibold text-gray-700 mb-2">N° Facture</label>
@@ -61,6 +61,18 @@
                                 <option value="impaye" {{ request('statut') == 'impaye' ? 'selected' : '' }}>Impayées</option>
                                 <option value="annulee" {{ request('statut') == 'annulee' ? 'selected' : '' }}>Annulées
                                 </option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-700 mb-2">Verification</label>
+                            <select name="verification"
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
+                                <option value="">Toutes</option>
+                                <option value="anomalies" {{ request('verification') == 'anomalies' ? 'selected' : '' }}>Avec anomalies</option>
+                                <option value="critical" {{ request('verification') == 'critical' ? 'selected' : '' }}>Erreurs</option>
+                                <option value="warning" {{ request('verification') == 'warning' ? 'selected' : '' }}>Avertissements</option>
+                                <option value="ok" {{ request('verification') == 'ok' ? 'selected' : '' }}>OK</option>
                             </select>
                         </div>
 
@@ -197,6 +209,8 @@
                                     <th
                                         class="px-4 py-3 md:px-6 text-left font-semibold text-gray-900 text-xs md:text-sm hidden md:table-cell">
                                         Statut</th>
+                                    <th class="px-4 py-3 md:px-6 text-center font-semibold text-gray-900 text-xs md:text-sm hidden lg:table-cell">
+                                        Verification</th>
                                     <th class="px-4 py-3 md:px-6 text-center font-semibold text-gray-900 text-xs md:text-sm">
                                         Actions</th>
                                 </tr>
@@ -214,11 +228,11 @@
                                             </a>
                                         </td>
                                         <td class="px-4 py-3 md:px-6 text-gray-700 text-xs md:text-sm hidden sm:table-cell">
-                                            {{ $facture->date_facture->format('d/m/Y') }}
+                                            {{ $facture->date_facture?->format('d/m/Y') ?? '—' }}
                                         </td>
                                         <td class="px-4 py-3 md:px-6">
                                             <div class="text-xs md:text-sm">
-                                                <p class="font-medium text-gray-900">{{ $facture->client->name }}</p>
+                                                <p class="font-medium text-gray-900">{{ $facture->client?->name ?? 'Client introuvable' }}</p>
                                                 <p class="text-gray-500 text-xs hidden md:block">
                                                     {{ $facture->created_at->format('d/m/Y H:i') }}</p>
                                             </div>
@@ -253,6 +267,9 @@
                                                     <i class="fa-solid fa-clock"></i> Impayée
                                                 </span>
                                             @endif
+                                        </td>
+                                        <td class="px-4 py-3 md:px-6 text-center hidden lg:table-cell">
+                                            @include('admins.factures.partials.verification-badge', ['facture' => $facture])
                                         </td>
                                         <td class="px-4 py-3 md:px-6 text-center">
                                             <div class="flex items-center justify-center gap-2">

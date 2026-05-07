@@ -21,6 +21,7 @@ class Paiement extends Model
         'image_recu',
         'facture_anterieur',
         'note','created_by',
+        'row_hash',
     ];
 
     public function facture()

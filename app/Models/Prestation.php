@@ -20,7 +20,8 @@ class Prestation extends Model
         'taux_ht',
         'taux_tva',
         'total_tva',
-        'total_ttc'
+        'total_ttc',
+        'row_hash'
 
     ];
 

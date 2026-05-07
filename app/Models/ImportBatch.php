@@ -16,6 +16,11 @@ class ImportBatch extends Model
         'total_rows',
         'processed_rows',
         'failed_rows',
+        'created_rows',
+        'updated_rows',
+        'skipped_rows',
+        'force_import',
+        'metadata',
         'error_summary',
         'started_at',
         'completed_at',
@@ -24,6 +29,8 @@ class ImportBatch extends Model
 
     protected $casts = [
         'error_summary' => 'array',
+        'metadata' => 'array',
+        'force_import' => 'boolean',
         'started_at'    => 'datetime',
         'completed_at'  => 'datetime',
     ];
@@ -31,6 +38,11 @@ class ImportBatch extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function verifications()
+    {
+        return $this->hasMany(ImportVerification::class);
     }
 
     public function getProgressPercentageAttribute(): int

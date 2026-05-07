@@ -174,6 +174,52 @@
         </div>
     </div>
 
+    <div class="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-5 shadow-sm mb-8">
+        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div>
+                <h3 class="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                    <i class="fa-solid fa-shield-halved text-blue-500"></i>
+                    Integrite des donnees
+                </h3>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Derniere verification: {{ $dataHealth['last_verified_at']?->format('d/m/Y H:i') ?? 'jamais' }}
+                </p>
+            </div>
+            <form x-data="{loading:false}" @submit="loading=true" method="POST" action="{{ route('admin.imports.verify-global') }}">
+                @csrf
+                <button type="submit"
+                    class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold">
+                    <i class="fa-solid fa-rotate" :class="loading ? 'fa-spin' : ''"></i>
+                    Lancer une verification globale
+                </button>
+            </form>
+        </div>
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mt-5">
+            <div>
+                <p class="text-xs text-gray-500 dark:text-gray-400">Score global</p>
+                <p class="text-2xl font-bold {{ $dataHealth['score'] >= 95 ? 'text-emerald-600' : ($dataHealth['score'] >= 80 ? 'text-amber-600' : 'text-red-600') }}">
+                    {{ $dataHealth['score'] }}%
+                </p>
+            </div>
+            <div>
+                <p class="text-xs text-gray-500 dark:text-gray-400">TVA</p>
+                <p class="text-lg font-bold text-gray-900 dark:text-white">{{ number_format($dataHealth['tva_anomalies'], 0, ',', ' ') }}</p>
+            </div>
+            <div>
+                <p class="text-xs text-gray-500 dark:text-gray-400">Sur-payees</p>
+                <p class="text-lg font-bold text-gray-900 dark:text-white">{{ number_format($dataHealth['overpaid_invoices'], 0, ',', ' ') }}</p>
+            </div>
+            <div>
+                <p class="text-xs text-gray-500 dark:text-gray-400">Paiements incoherents</p>
+                <p class="text-lg font-bold text-gray-900 dark:text-white">{{ number_format($dataHealth['payment_mismatches'], 0, ',', ' ') }}</p>
+            </div>
+            <div>
+                <p class="text-xs text-gray-500 dark:text-gray-400">Ecart detecte</p>
+                <p class="text-lg font-bold text-gray-900 dark:text-white">{{ number_format($dataHealth['total_detected_delta'], 2, ',', ' ') }} DA</p>
+            </div>
+        </div>
+    </div>
+
     {{-- ── Graphiques ───────────────────────────────────────────────────────── --}}
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-8">
 

@@ -23,7 +23,14 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'role',
+        'client_id',
     ];
+
+    protected $attributes = [
+        'role' => 'client',
+    ];
+
     protected $casts = [
         'role' => UserRole::class,
     ];
@@ -56,6 +63,6 @@ class User extends Authenticatable
 
     public function isAdmin()
     {
-        return $this->role === 'Admin';
+        return $this->role === UserRole::ADMIN;
     }
 }

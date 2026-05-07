@@ -1,11 +1,12 @@
 <?php
-// app/Imports/FacturesPayeesImport.php
+
 namespace App\Imports;
 
 use App\Imports\Concerns\ParsesExcelData;
 use App\Models\{Client, Escale, Facture, ImportBatch, Navire};
+use App\Services\ImportRowHasher;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\{Auth, Cache, DB};
+use Illuminate\Support\Facades\{Cache, DB};
 use Maatwebsite\Excel\Concerns\{
     Importable,
     SkipsErrors,
@@ -34,10 +35,9 @@ class FacturesPayeesImport extends StringValueBinder implements
     private int $updatedCount = 0;
     private int $skippedCount = 0;
 
-    // Caches locaux
-    private array $clientCache = [];   // code_client    → Client
-    private array $navireCache = [];   // "nom|pavillon"  → Navire
-    private array $escaleCache = [];   // navire_id       → Escale
+    private array $clientCache = [];
+    private array $navireCache = [];
+    private array $escaleCache = [];
 
     public function __construct(private readonly ImportBatch $batch)
     {
@@ -46,93 +46,109 @@ class FacturesPayeesImport extends StringValueBinder implements
     public function collection(Collection $rows): void
     {
         $now = now()->toDateTimeString();
-        $userId = Auth::id();
+        $userId = $this->batch->created_by;
 
-        // ── Pré-charger les numéros existants pour stats create/update ────
         $numeros = $rows
-            ->pluck('FACTURE')
+            ->map(fn ($row) => trim((string) $this->cellValue($row, 'facture', '')))
             ->filter()
-            ->map(fn($v) => trim($v))
             ->unique()
-            ->toArray();
+            ->values()
+            ->all();
 
-        $existants = Facture::whereIn('numero_facture', $numeros)
-            ->pluck('numero_facture')
-            ->flip()
-            ->toArray();
+        $existingHashes = Facture::whereIn('numero_facture', $numeros)
+            ->pluck('row_hash', 'numero_facture')
+            ->map(fn ($hash) => $hash ?? '__EXISTS_NO_HASH__')
+            ->all();
 
         $records = [];
+        $createdRows = 0;
+        $updatedRows = 0;
+        $unchangedRows = 0;
 
         foreach ($rows as $row) {
-            // ── Numéro obligatoire ────────────────────────────────────────
-            $numero = trim($row['FACTURE'] ?? '');
-            if (empty($numero))
+            $numero = trim((string) $this->cellValue($row, 'facture', ''));
+            if ($numero === '') {
                 continue;
+            }
 
-            // ── Client ───────────────────────────────────────────────────
+            $rowHash = ImportRowHasher::hash($this->batch->type, $row);
+            $existingHash = $existingHashes[$numero] ?? null;
+
+            if (
+                ! $this->batch->force_import
+                && $existingHash
+                && $existingHash !== '__EXISTS_NO_HASH__'
+                && hash_equals((string) $existingHash, $rowHash)
+            ) {
+                $this->skippedCount++;
+                $unchangedRows++;
+                continue;
+            }
+
             $clientId = null;
-            $codeClient = trim($row['CODE_CLIENT'] ?? '');
+            $codeClient = trim((string) $this->cellValue($row, 'code_client', ''));
 
-            if (!empty($codeClient)) {
-                if (!isset($this->clientCache[$codeClient])) {
+            if ($codeClient !== '') {
+                if (! isset($this->clientCache[$codeClient])) {
                     $this->clientCache[$codeClient] = Client::firstOrCreate(
                         ['code_client' => $codeClient],
                         [
-                            'name' => trim($row['NOM_CLIENT'] ?? ''),
-                            'adresse' => trim($row['ADRESSE'] ?? ''),
-                            'rc' => trim($row['RC'] ?? ''),
-                            'nis' => trim($row['NIS'] ?? ''),
-                            'ai' => trim($row['AI'] ?? ''),
-                            'nif' => trim($row['NIF'] ?? ''),
+                            'name' => trim((string) $this->cellValue($row, 'nom_client', '')),
+                            'adresse' => trim((string) $this->cellValue($row, 'adresse', '')),
+                            'rc' => trim((string) $this->cellValue($row, 'rc', '')),
+                            'nis' => trim((string) $this->cellValue($row, 'nis', '')),
+                            'ai' => trim((string) $this->cellValue($row, 'ai', '')),
+                            'nif' => trim((string) $this->cellValue($row, 'nif', '')),
                         ]
                     );
                 }
+
                 $clientId = $this->clientCache[$codeClient]->id;
             }
 
-            // ── Navire (même logique que FacturesImport) ──────────────────
-            $navireNom = trim($row['NAVIRE'] ?? 'NAVIRE INCONNU');
-            $pavillon = trim($row['PAVILLON'] ?? 'INCONNU');
-            $navireKey = $navireNom . '|' . $pavillon;
+            $navireNom = trim((string) $this->cellValue($row, 'navire', 'NAVIRE INCONNU'));
+            $pavillon = trim((string) $this->cellValue($row, 'pavillon', 'INCONNU'));
+            $navireKey = $navireNom.'|'.$pavillon;
 
-            if (!isset($this->navireCache[$navireKey])) {
-                $this->navireCache[$navireKey] = Navire::firstOrCreate(
-                    ['nom' => $navireNom, 'pavillon' => $pavillon]
-                );
+            if (! isset($this->navireCache[$navireKey])) {
+                $this->navireCache[$navireKey] = Navire::firstOrCreate([
+                    'nom' => $navireNom,
+                    'pavillon' => $pavillon,
+                ]);
             }
+
             $navire = $this->navireCache[$navireKey];
 
-            // ── Escale (même logique que FacturesImport) ──────────────────
-            if (!isset($this->escaleCache[$navire->id])) {
+            if (! isset($this->escaleCache[$navire->id])) {
                 $this->escaleCache[$navire->id] = Escale::firstOrCreate(
                     ['navire_id' => $navire->id],
                     [
-                        'date_arrivee' => $this->parseDate($row['ENTREE'] ?? ''),
-                        'date_sortie' => $this->parseDate($row['SORTIE'] ?? ''),
+                        'date_arrivee' => $this->parseDate($this->cellValue($row, 'entree', '')),
+                        'date_sortie' => $this->parseDate($this->cellValue($row, 'sortie', '')),
                     ]
                 );
             }
-            $escaleId = $this->escaleCache[$navire->id]->id;
 
-            // ── Stats create / update ─────────────────────────────────────
-            isset($existants[$numero]) ? $this->updatedCount++ : $this->createdCount++;
+            $existingHash ? $updatedRows++ : $createdRows++;
+            $existingHash ? $this->updatedCount++ : $this->createdCount++;
 
             $records[] = [
                 'numero_facture' => $numero,
                 'client_id' => $clientId,
-                'escale_id' => $escaleId,          // ← escale_id comme FacturesImport
-                'date_facture' => $this->parseDate($row['DATE'] ?? ''),
-                'bordereau' => trim($row['BORDEREAU'] ?? ''),
-                'description' => trim($row['DESCRIPTION'] ?? ''),
-                'pour' => trim($row['POUR'] ?? ''),
-                'total_ht' => $this->parseAmount($row['TOTAL_HT'] ?? '0'),
-                'total_tva' => $this->parseAmount($row['TOTAL_TVA'] ?? '0'),
-                'total_ttc' => $this->parseAmount($row['TOTAL_TTC'] ?? '0'),
-                'reste_a_payer' => $this->parseAmount($row['RESTE'] ?? '0'),
-                'devise' => trim($row['DEVISE'] ?? 'DA'),
-                'taux_devise' => $this->parseAmount($row['TAUX_DEVISE'] ?? '1'),
-                'mode_paiement' => trim($row['PAIEMENT'] ?? ''),
-                'annuler' => 0,                  // ← forcé à 0 toujours
+                'escale_id' => $this->escaleCache[$navire->id]->id,
+                'date_facture' => $this->parseDate($this->cellValue($row, 'date', '')),
+                'bordereau' => trim((string) $this->cellValue($row, 'bordereau', '')),
+                'description' => trim((string) $this->cellValue($row, 'description', '')),
+                'pour' => trim((string) $this->cellValue($row, 'pour', '')),
+                'total_ht' => $this->parseAmount($this->cellValue($row, 'total_ht', '0')),
+                'total_tva' => $this->parseAmount($this->cellValue($row, 'total_tva', '0')),
+                'total_ttc' => $this->parseAmount($this->cellValue($row, 'total_ttc', '0')),
+                'reste_a_payer' => $this->parseAmount($this->cellValue($row, 'reste', '0')),
+                'devise' => trim((string) $this->cellValue($row, 'devise', 'DA')),
+                'taux_devise' => $this->parseAmount($this->cellValue($row, 'taux_devise', '1')),
+                'mode_paiement' => trim((string) $this->cellValue($row, 'paiement', '')),
+                'annuler' => 0,
+                'row_hash' => $rowHash,
                 'created_by' => $userId,
                 'created_at' => $now,
                 'updated_at' => $now,
@@ -141,8 +157,7 @@ class FacturesPayeesImport extends StringValueBinder implements
             $this->localCount++;
         }
 
-        // ── Upsert groupé ─────────────────────────────────────────────────
-        if (!empty($records)) {
+        if ($records !== []) {
             DB::table('factures')->upsert(
                 $records,
                 ['numero_facture'],
@@ -161,20 +176,23 @@ class FacturesPayeesImport extends StringValueBinder implements
                     'taux_devise',
                     'mode_paiement',
                     'annuler',
+                    'row_hash',
                     'updated_at',
                 ]
             );
         }
 
-        // ── Progression ───────────────────────────────────────────────────
-        $count = count($records);
+        $count = count($records) + $unchangedRows;
         Cache::increment("import_batch_{$this->batch->id}", $count);
         $this->batch->increment('processed_rows', $count);
+        $this->batch->increment('created_rows', $createdRows);
+        $this->batch->increment('updated_rows', $updatedRows);
+        $this->batch->increment('skipped_rows', $unchangedRows);
     }
 
     public function chunkSize(): int
     {
-        return 300;
+        return 500;
     }
 
     public function getStats(): array

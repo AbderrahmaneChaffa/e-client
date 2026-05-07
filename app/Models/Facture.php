@@ -33,18 +33,31 @@ class Facture extends Model
         'mode_paiement',  // Ajouté
         'annuler',        // Ajouté
         'created_by',     // Ajouté
+        'row_hash',
+        'needs_review',
+        'verification_status',
+        'verification_flags',
+        'last_verified_at',
     ];
 
     // Dates automatiques
     protected $casts = [
         'date_facture' => 'date',
         'date_echeance' => 'date',
+        'needs_review' => 'boolean',
+        'verification_flags' => 'array',
+        'last_verified_at' => 'datetime',
     ];
 
     // Filtre pour les factures impayées (Utilisé pour l'affichage client)
     public function scopeImpayees(Builder $query): void
     {
         $query->where('reste_a_payer', '>', 0);
+    }
+
+    public function scopeWithVerificationIssues(Builder $query): void
+    {
+        $query->whereIn('verification_status', ['warning', 'critical']);
     }
 
     public function client(): BelongsTo

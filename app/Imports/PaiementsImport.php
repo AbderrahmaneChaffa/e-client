@@ -1,11 +1,12 @@
 <?php
-// app/Imports/PaiementsImport.php
+
 namespace App\Imports;
 
 use App\Imports\Concerns\ParsesExcelData;
-use App\Models\{Facture, ImportBatch};
+use App\Models\{Client, Facture, ImportBatch};
+use App\Services\ImportRowHasher;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\{Auth, Cache, DB, Log};
+use Illuminate\Support\Facades\{Cache, DB, Log};
 use Maatwebsite\Excel\Concerns\{
     Importable,
     SkipsErrors,
@@ -31,9 +32,6 @@ class PaiementsImport extends StringValueBinder implements
 
     private int $localCount = 0;
     private int $skippedCount = 0;
-
-    // Cache local : numero_facture → facture_id
-    // Persiste entre les chunks pour éviter les requêtes répétées
     private array $factureCache = [];
     private array $missingFactures = [];
 
@@ -43,93 +41,145 @@ class PaiementsImport extends StringValueBinder implements
 
     public function collection(Collection $rows): void
     {
-        // ── 1. Collecter tous les numéros de facture du chunk ────────────────
-        $numeros = $rows
-            ->pluck('facture')
-            ->filter()
-            ->map(fn($v) => trim((string) $v))
-            ->unique()
-            ->toArray();
+        if ($this->batch->processed_rows === 0) {
+            Log::channel('imports')->debug('PAIEMENTS colonnes détectées', [
+                'keys' => array_keys($rows->first()?->toArray() ?? []),
+            ]);
+        }
 
-        // ── 2. Charger uniquement les IDs non encore en cache (1 requête) ────
+        $numeros = $rows
+            ->map(fn ($row) => trim((string) $this->cellValue($row, 'facture', '')))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
         $newNumeros = array_diff($numeros, array_keys($this->factureCache));
 
-        if (!empty($newNumeros)) {
+        if ($newNumeros !== []) {
             Facture::whereIn('numero_facture', $newNumeros)
                 ->select('id', 'numero_facture')
                 ->get()
-                ->each(function ($f) {
-                    $this->factureCache[$f->numero_facture] = $f->id;
+                ->each(fn ($facture) => $this->factureCache[$facture->numero_facture] = $facture->id);
+        }
+
+        $factureIds = [];
+        $recus = [];
+
+        foreach ($rows as $row) {
+            $numero = trim((string) $this->cellValue($row, 'facture', ''));
+            $recu = trim((string) $this->cellValue($row, 'recu', ''));
+
+            if ($numero !== '' && $recu !== '' && isset($this->factureCache[$numero])) {
+                $factureIds[] = $this->factureCache[$numero];
+                $recus[] = $recu;
+            }
+        }
+
+        $existingHashes = [];
+        if ($factureIds !== [] && $recus !== []) {
+            DB::table('paiements')
+                ->whereIn('facture_id', array_values(array_unique($factureIds)))
+                ->whereIn('recu', array_values(array_unique($recus)))
+                ->select('facture_id', 'recu', 'row_hash')
+                ->get()
+                ->each(function ($row) use (&$existingHashes) {
+                    $existingHashes[$row->facture_id.'|'.$row->recu] = $row->row_hash ?? '__EXISTS_NO_HASH__';
                 });
         }
 
-        // ── 3. Construire les enregistrements à insérer/mettre à jour ────────
         $now = now()->toDateTimeString();
-        $userId = Auth::id();
+        $userId = $this->batch->created_by;
         $paiements = [];
-        $soldesMAJ = []; // [facture_id => reste] — dernier reste connu du chunk
+        $soldesMAJ = [];
+        $createdRows = 0;
+        $updatedRows = 0;
+        $unchangedRows = 0;
+        $missingRows = 0;
 
         foreach ($rows as $row) {
-            $numero = trim((string) ($row['facture'] ?? ''));
-            $recu = trim((string) ($row['recu'] ?? ''));
+            $numero = trim((string) $this->cellValue($row, 'facture', ''));
+            $recu = trim((string) $this->cellValue($row, 'recu', ''));
 
-            if (empty($numero))
-                continue;
-
-            $factureId = $this->factureCache[$numero] ?? null;
-
-            if (!$factureId) {
-                $this->missingFactures[$numero] = true;
-                $this->skippedCount++;
+            if ($numero === '') {
                 continue;
             }
 
-            $montant = $this->parseAmount($row['paye'] ?? '0');
-            $reste = $this->parseAmount($row['reste'] ?? '0');
+            $factureId = $this->factureCache[$numero] ?? null;
+
+            if (! $factureId) {
+                $factureId = $this->createGhostFacture($numero, $row, $now, $userId);
+
+                if (! $factureId) {
+                    $this->missingFactures[$numero] = true;
+                    $this->skippedCount++;
+                    $missingRows++;
+                    continue;
+                }
+
+                $this->factureCache[$numero] = $factureId;
+            }
+
+            $rowHash = ImportRowHasher::hash($this->batch->type, $row);
+            $existingKey = $factureId.'|'.$recu;
+            $existingHash = $existingHashes[$existingKey] ?? null;
+
+            if (
+                ! $this->batch->force_import
+                && $existingHash
+                && $existingHash !== '__EXISTS_NO_HASH__'
+                && hash_equals((string) $existingHash, $rowHash)
+            ) {
+                $unchangedRows++;
+                continue;
+            }
+
+            $existingHash ? $updatedRows++ : $createdRows++;
+
+            $montant = $this->parseAmount($this->cellValue($row, 'paye', '0'));
+            $reste = $this->parseAmount($this->cellValue($row, 'reste', '0'));
 
             $paiements[] = [
                 'facture_id' => $factureId,
                 'recu' => $recu,
                 'montant' => $montant,
-                'date_paiement' => $this->parseDate($row['Date'] ?? ''),
-                'numero_cheque' => trim((string) ($row['cheque'] ?? '')),
-                'banque' => trim((string) ($row['banque'] ?? '')),
-                'facture_anterieur' => trim((string) ($row['facture_Anterieur'] ?? '')),
+                'date_paiement' => $this->parseDate($this->cellValue($row, 'date', '')),
+                'numero_cheque' => trim((string) $this->cellValue($row, 'cheque', '')),
+                'banque' => trim((string) $this->cellValue($row, 'banque', '')),
+                'facture_anterieur' => trim((string) $this->cellValue($row, 'facture_anterieur', '')),
+                'row_hash' => $rowHash,
                 'created_by' => $userId,
                 'created_at' => $now,
                 'updated_at' => $now,
             ];
 
-            // On garde le dernier reste connu pour chaque facture du chunk
             $soldesMAJ[$factureId] = $reste;
-
             $this->localCount++;
         }
 
-        // ── 4. Upsert paiements — 1 requête pour tout le chunk ───────────────
-        if (!empty($paiements)) {
+        if ($paiements !== []) {
             DB::table('paiements')->upsert(
                 $paiements,
-                ['facture_id', 'recu'],          // clé unique
-                [                                 // colonnes à mettre à jour
+                ['facture_id', 'recu'],
+                [
                     'montant',
                     'date_paiement',
                     'numero_cheque',
                     'banque',
                     'facture_anterieur',
+                    'row_hash',
                     'updated_at',
                 ]
             );
         }
 
-        // ── 5. MAJ des soldes factures — 1 requête CASE WHEN ─────────────────
-        if (!empty($soldesMAJ)) {
+        if ($soldesMAJ !== []) {
             $cases = '';
             $ids = [];
             $bindings = [];
 
             foreach ($soldesMAJ as $factureId => $reste) {
-                $cases .= " WHEN ? THEN ?";
+                $cases .= ' WHEN ? THEN ?';
                 $bindings[] = $factureId;
                 $bindings[] = $reste;
                 $ids[] = $factureId;
@@ -139,45 +189,35 @@ class PaiementsImport extends StringValueBinder implements
             $allBindings = array_merge($bindings, $ids);
 
             DB::statement(
-                "UPDATE factures
-                 SET reste_a_payer = CASE id {$cases} END
-                 WHERE id IN ({$placeholders})",
+                "UPDATE factures SET reste_a_payer = CASE id {$cases} END WHERE id IN ({$placeholders})",
                 $allBindings
             );
         }
 
-        // ── 6. Mise à jour progression ────────────────────────────────────────
-        $count = count($paiements);
-        if ($count > 0) {
-            Cache::increment("import_batch_{$this->batch->id}", $count);
-            $this->batch->increment('processed_rows', $count);
-        }
+        $processedRows = count($paiements) + $unchangedRows + $missingRows;
+        Cache::increment("import_batch_{$this->batch->id}", $processedRows);
+        $this->batch->increment('processed_rows', $processedRows);
+        $this->batch->increment('created_rows', $createdRows);
+        $this->batch->increment('updated_rows', $updatedRows);
+        $this->batch->increment('skipped_rows', $unchangedRows);
     }
 
-    /**
-     * Taille du chunk — 500 est le bon équilibre :
-     * - Assez grand pour que le SELECT whereIn soit efficace
-     * - Assez petit pour ne pas saturer la mémoire PHP
-     */
     public function chunkSize(): int
     {
         return 500;
     }
 
-    /**
-     * Appelé par ProcessImportJob après la fin de l'import.
-     * Log groupé — évite des milliers d'entrées individuelles.
-     */
     public function logMissingFactures(): void
     {
-        if (empty($this->missingFactures))
+        if ($this->missingFactures === []) {
             return;
+        }
 
         $count = count($this->missingFactures);
         $samples = array_slice(array_keys($this->missingFactures), 0, 20);
 
-        Log::warning("PaiementsImport [batch #{$this->batch->id}] : {$count} facture(s) introuvable(s)", [
-            'exemples' => $samples,
+        Log::channel('imports')->warning("PaiementsImport [batch #{$this->batch->id}] missing invoices", [
+            'samples' => $samples,
             'total' => $count,
         ]);
 
@@ -188,8 +228,65 @@ class PaiementsImport extends StringValueBinder implements
     {
         return $this->localCount;
     }
+
     public function getSkippedCount(): int
     {
         return $this->skippedCount;
+    }
+
+    private function createGhostFacture(string $numero, mixed $row, string $now, ?int $userId): ?int
+    {
+        $codeClient = trim((string) $this->cellValue($row, 'code_client', ''));
+        $totalTtc = $this->parseAmount($this->cellValue($row, 'total_ttc', '0'));
+
+        if ($codeClient === '' || $totalTtc <= 0) {
+            return null;
+        }
+
+        $client = Client::firstOrCreate(
+            ['code_client' => $codeClient],
+            ['name' => trim((string) $this->cellValue($row, 'nom_client', 'Client import paiement')) ?: 'Client import paiement']
+        );
+
+        $date = $this->parseDate($this->cellValue($row, 'date', ''))?->toDateString() ?? now()->toDateString();
+        $reste = $this->parseAmount($this->cellValue($row, 'reste', '0'));
+        $totalHt = round($totalTtc / 1.19, 2);
+
+        $factureId = DB::table('factures')->insertGetId([
+            'numero_facture' => $numero,
+            'date_facture' => $date,
+            'client_id' => $client->id,
+            'escale_id' => null,
+            'total_ht' => $totalHt,
+            'total_tva' => round($totalTtc - $totalHt, 2),
+            'total_ttc' => $totalTtc,
+            'montant_paye' => max(0, $totalTtc - $reste),
+            'reste_a_payer' => $reste,
+            'description' => 'Facture minimale créée depuis le fichier paiements.',
+            'devise' => 'DA',
+            'taux_devise' => 1,
+            'mode_paiement' => 1,
+            'annuler' => 0,
+            'needs_review' => 1,
+            'verification_status' => 'warning',
+            'verification_flags' => json_encode([[
+                'code' => 'imported_from_payment',
+                'label' => 'Facture créée depuis paiement',
+                'severity' => 'warning',
+            ]], JSON_UNESCAPED_SLASHES),
+            'last_verified_at' => $now,
+            'created_by' => $userId,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        Log::channel('imports')->warning('Facture fantôme créée depuis PaiementsImport', [
+            'batch_id' => $this->batch->id,
+            'numero_facture' => $numero,
+            'facture_id' => $factureId,
+            'code_client' => $codeClient,
+        ]);
+
+        return (int) $factureId;
     }
 }

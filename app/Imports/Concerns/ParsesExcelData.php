@@ -8,6 +8,55 @@ use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 
 trait ParsesExcelData
 {
+    private function cellValue(mixed $row, string $heading, mixed $default = null): mixed
+    {
+        $candidates = array_unique([
+            $heading,
+            strtoupper($heading),
+            strtolower($heading),
+            $this->normalizeHeading($heading),
+        ]);
+
+        foreach ($candidates as $candidate) {
+            if (is_array($row) && array_key_exists($candidate, $row)) {
+                return $row[$candidate];
+            }
+
+            if ($row instanceof \ArrayAccess && isset($row[$candidate])) {
+                return $row[$candidate];
+            }
+        }
+
+        $items = $row instanceof \Illuminate\Support\Collection ? $row->all() : (array) $row;
+        $normalizedHeading = $this->normalizeHeading($heading);
+
+        foreach ($items as $key => $value) {
+            if ($this->normalizeHeading((string) $key) === $normalizedHeading) {
+                return $value;
+            }
+        }
+
+        return $default;
+    }
+
+    private function normalizeHeading(string $heading): string
+    {
+        $heading = trim($heading);
+        $heading = strtr($heading, [
+            'À' => 'A', 'Á' => 'A', 'Â' => 'A', 'Ä' => 'A', 'à' => 'a', 'á' => 'a', 'â' => 'a', 'ä' => 'a',
+            'È' => 'E', 'É' => 'E', 'Ê' => 'E', 'Ë' => 'E', 'è' => 'e', 'é' => 'e', 'ê' => 'e', 'ë' => 'e',
+            'Ì' => 'I', 'Í' => 'I', 'Î' => 'I', 'Ï' => 'I', 'ì' => 'i', 'í' => 'i', 'î' => 'i', 'ï' => 'i',
+            'Ò' => 'O', 'Ó' => 'O', 'Ô' => 'O', 'Ö' => 'O', 'ò' => 'o', 'ó' => 'o', 'ô' => 'o', 'ö' => 'o',
+            'Ù' => 'U', 'Ú' => 'U', 'Û' => 'U', 'Ü' => 'U', 'ù' => 'u', 'ú' => 'u', 'û' => 'u', 'ü' => 'u',
+            'Ç' => 'C', 'ç' => 'c',
+        ]);
+
+        $heading = strtolower($heading);
+        $heading = preg_replace('/[^a-z0-9]+/', '_', $heading) ?? $heading;
+
+        return trim($heading, '_');
+    }
+
     /**
      * Convertit "128 661,48" / "128.661,48" / 128661.48 en float.
      */

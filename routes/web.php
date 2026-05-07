@@ -7,10 +7,18 @@ use App\Http\Controllers\FactureController;
 use App\Http\Controllers\FileUploadController;
 use App\Http\Controllers\PaiementController;
 use App\Http\Controllers\ProfileController;
+use App\UserRole;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
-    return view('auth.login');
+    if (! Auth::check()) {
+        return redirect()->route('login');
+    }
+
+    return Auth::user()->role === UserRole::ADMIN
+        ? redirect()->route('admin.dashboard')
+        : redirect()->route('client.dashboard');
 });
 Route::middleware(['auth', 'verified'])->group(function () {
 
@@ -30,10 +38,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
             // Upload + dispatch de la chaîne de jobs
             Route::post('/', [ImportController::class, 'store'])->name('store');
+            Route::post('/preview', [ImportController::class, 'preview'])->name('preview');
+            Route::post('/verify-global', [ImportController::class, 'verifyGlobal'])->name('verify-global');
 
             // Progression d'un batch (appelé par le polling Alpine.js)
             Route::get('/{batch}/progress', [ImportController::class, 'progress'])
                 ->name('progress');
+            Route::post('/{batch}/resume', [ImportController::class, 'resume'])
+                ->name('resume');
 
             // Suppression d'un batch terminé/échoué
             Route::delete('/{batch}', [ImportController::class, 'destroy'])

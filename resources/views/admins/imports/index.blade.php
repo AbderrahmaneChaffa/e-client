@@ -33,6 +33,33 @@
         {{-- ── Zones de dépôt ──────────────────────────────────────────────────────── --}}
         <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 mb-6">
 
+            <div class="mb-5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 p-4">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div>
+                        <p class="text-sm font-semibold text-gray-800 dark:text-gray-100">Upload automatique</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">Selectionnez 1 a 5 fichiers, dans n'importe quel ordre.</p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <input x-ref="adaptiveFiles" type="file" accept=".xlsx,.xls" multiple class="hidden"
+                            @change="setAdaptiveFiles($event)" />
+                        <button type="button" @click="$refs.adaptiveFiles.click()"
+                            class="px-3 py-2 rounded-lg text-xs font-semibold bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
+                            Choisir fichiers
+                        </button>
+                        <button type="button" @click="preview()" :disabled="!hasAnyFile || isProcessing"
+                            class="px-3 py-2 rounded-lg text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-700 disabled:bg-gray-300 dark:disabled:bg-gray-600">
+                            Previsualiser
+                        </button>
+                    </div>
+                </div>
+                <div x-show="adaptiveFiles.length" x-cloak class="mt-3 flex flex-wrap gap-2">
+                    <template x-for="file in adaptiveFiles" :key="file.name + file.size">
+                        <span class="px-2 py-1 rounded bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs text-gray-600 dark:text-gray-300"
+                            x-text="file.name"></span>
+                    </template>
+                </div>
+            </div>
+
             {{-- Ligne 1 : 3 zones --}}
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
 
@@ -203,7 +230,12 @@
             </div>
 
             {{-- Bouton lancer --}}
-            <div class="flex items-center gap-4">
+            <div class="flex flex-wrap items-center gap-4">
+                <label class="inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                    <input type="checkbox" x-model="forceImport"
+                        class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                    Import force
+                </label>
                 <button @click="submit()" :disabled="!hasAnyFile || isProcessing" class="inline-flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-semibold
                                                        text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800
                                                        disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed
@@ -231,6 +263,48 @@
         </div>
 
         {{-- ── Barres de progression ────────────────────────────────────────────────── --}}
+        <div x-show="previewReport" x-cloak class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 mb-6">
+            <div class="flex items-center justify-between gap-3 mb-4">
+                <div>
+                    <h2 class="text-base font-bold text-gray-900 dark:text-white">Apercu pre-import</h2>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                        <span x-text="previewReport?.summary?.rows ?? 0"></span> lignes detectees,
+                        <span x-text="previewReport?.summary?.created ?? 0"></span> nouvelles,
+                        <span x-text="previewReport?.summary?.updated ?? 0"></span> mises a jour,
+                        <span x-text="previewReport?.summary?.skipped ?? 0"></span> ignorees.
+                    </p>
+                </div>
+                <span class="px-2 py-1 rounded-full text-xs font-semibold"
+                    :class="previewReport?.valid ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'"
+                    x-text="previewReport?.valid ? 'Format valide' : 'A corriger'"></span>
+            </div>
+
+            <div class="grid gap-3">
+                <template x-for="file in previewReport?.files ?? []" :key="file.filename">
+                    <div class="rounded-lg border border-gray-100 dark:border-gray-700 p-3">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                                <p class="text-sm font-semibold text-gray-800 dark:text-gray-100" x-text="file.filename"></p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">
+                                    Type: <span x-text="file.type"></span> -
+                                    Lignes: <span x-text="file.row_count"></span> -
+                                    TTC: <span x-text="formatAmount(file.totals?.total_ttc ?? 0)"></span> DA
+                                </p>
+                            </div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400">
+                                <span x-text="file.impact.created"></span> C /
+                                <span x-text="file.impact.updated"></span> M /
+                                <span x-text="file.impact.skipped"></span> I
+                            </div>
+                        </div>
+                        <div x-show="file.missing_headers?.length" class="mt-2 text-xs text-red-600">
+                            Colonnes manquantes: <span x-text="file.missing_headers.join(', ')"></span>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+
         @php
             $typeConfig = [
                 'factures' => ['label' => 'Factures', 'color' => 'amber'],
@@ -443,6 +517,11 @@
                                     <span class="text-gray-400 text-xs">
                                         / {{ number_format($batch->total_rows, 0, ',', ' ') }}
                                     </span>
+                                    <div class="text-[10px] text-gray-400 mt-1">
+                                        +{{ number_format($batch->created_rows ?? 0, 0, ',', ' ') }}
+                                        / ~{{ number_format($batch->updated_rows ?? 0, 0, ',', ' ') }}
+                                        / ={{ number_format($batch->skipped_rows ?? 0, 0, ',', ' ') }}
+                                    </div>
                                 </td>
 
                                 {{-- Ignorées --}}
@@ -551,6 +630,9 @@
                     factures_payees: null,
                     prestations_payees: null,
                 },
+                adaptiveFiles: [],
+                forceImport: false,
+                previewReport: null,
 
                 isProcessing: false,
                 pollingInterval: null,
@@ -573,11 +655,11 @@
 
                 // ── Computed ──────────────────────────────────────────────────────
                 get hasAnyFile() {
-                    return Object.values(this.files).some(f => f !== null);
+                    return this.adaptiveFiles.length > 0 || Object.values(this.files).some(f => f !== null);
                 },
 
                 get fileCount() {
-                    return Object.values(this.files).filter(f => f !== null).length;
+                    return this.adaptiveFiles.length + Object.values(this.files).filter(f => f !== null).length;
                 },
 
                 get allDone() {
@@ -591,6 +673,45 @@
                 // ── Init ──────────────────────────────────────────────────────────
                 init() { },
 
+                setAdaptiveFiles(event) {
+                    this.adaptiveFiles = Array.from(event.target.files || []).slice(0, 5);
+                    this.previewReport = null;
+                },
+
+                appendFiles(formData) {
+                    formData.append('_token', '{{ csrf_token() }}');
+                    formData.append('force_import', this.forceImport ? '1' : '0');
+                    this.adaptiveFiles.forEach(file => formData.append('files[]', file));
+                    if (this.files.factures) formData.append('file_factures', this.files.factures);
+                    if (this.files.prestations) formData.append('file_prestations', this.files.prestations);
+                    if (this.files.paiements) formData.append('file_paiements', this.files.paiements);
+                    if (this.files.factures_payees) formData.append('file_factures_payees', this.files.factures_payees);
+                    if (this.files.prestations_payees) formData.append('file_prestations_payees', this.files.prestations_payees);
+                },
+
+                formatAmount(value) {
+                    return Number(value || 0).toLocaleString('fr-DZ', { maximumFractionDigits: 2 });
+                },
+
+                async preview() {
+                    if (!this.hasAnyFile || this.isProcessing) return;
+                    const formData = new FormData();
+                    this.appendFiles(formData);
+
+                    try {
+                        const res = await fetch('{{ route("admin.imports.preview") }}', {
+                            method: 'POST',
+                            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                            body: formData,
+                        });
+                        const data = await res.json();
+                        if (!res.ok) throw new Error(data.message ?? 'Erreur preview');
+                        this.previewReport = data;
+                    } catch (err) {
+                        alert('Erreur de previsualisation :\n' + err.message);
+                    }
+                },
+
                 // ── Soumission ────────────────────────────────────────────────────
                 async submit() {
                     if (!this.hasAnyFile || this.isProcessing) return;
@@ -598,13 +719,7 @@
                     this.isProcessing = true;
 
                     const formData = new FormData();
-                    formData.append('_token', '{{ csrf_token() }}');
-
-                    if (this.files.factures) formData.append('file_factures', this.files.factures);
-                    if (this.files.prestations) formData.append('file_prestations', this.files.prestations);
-                    if (this.files.paiements) formData.append('file_paiements', this.files.paiements);
-                    if (this.files.factures_payees) formData.append('file_factures_payees', this.files.factures_payees);
-                    if (this.files.prestations_payees) formData.append('file_prestations_payees', this.files.prestations_payees);
+                    this.appendFiles(formData);
 
                     try {
                         const res = await fetch('{{ route("admin.imports.store") }}', {
