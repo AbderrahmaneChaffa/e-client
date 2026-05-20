@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\ImportBatch;
 use App\Models\ImportVerification;
 use Illuminate\Database\Query\Builder;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
@@ -14,6 +15,7 @@ class ImportVerificationService
     private const TVA_RATE = 1.19;
     private const MONEY_TOLERANCE = 0.01;
     private const PRESTATION_TOLERANCE = 1.00;
+    private const SQL_NUMERIC_CAST = 'CAST(? AS DECIMAL(20,6))';
 
     private const SEVERITY_WEIGHT = [
         'info' => 0,
@@ -24,15 +26,24 @@ class ImportVerificationService
     /** @var array<int, array{severity:string, flags:array<int, array{code:string, label:string, severity:string}>}> */
     private array $invoiceIssues = [];
 
+    /** @var array<int>|null null means global verification */
+    private ?array $scopedBatchIds = null;
+
+    private bool $scopeIsEmpty = false;
+
+    private ?int $scopedInvoiceCount = null;
+
     /**
      * Run all import verification rules and persist aggregate results.
      *
-     * @return array{critical:int, warning:int, info:int, affected_invoices:int, score:int}
+     * @return array{critical:int, warning:int, info:int, affected_invoices:int, score:int, verified_at:string}
      */
-    public function verify(?ImportBatch $batch = null, array $relatedBatchIds = []): array
+    public function verify(?ImportBatch $batch = null, array $relatedBatchIds = [], ?callable $progress = null): array
     {
         $startedAt = microtime(true);
         $this->invoiceIssues = [];
+        $this->assertVerificationSchemaReady();
+        $this->prepareInvoiceScope($batch, $relatedBatchIds);
 
         ImportVerification::query()
             ->when($batch, fn ($query) => $query->where('import_batch_id', $batch->id), fn ($query) => $query->whereNull('import_batch_id'))
@@ -40,16 +51,38 @@ class ImportVerificationService
 
         $this->resetInvoiceStatuses();
 
-        $results = [
-            $this->verifyVatCoherence($batch, $relatedBatchIds),
-            $this->verifyPaymentBalance($batch, $relatedBatchIds),
-            $this->verifyNegativeAmounts($batch, $relatedBatchIds),
-            $this->verifyOverpaidInvoices($batch, $relatedBatchIds),
-            $this->verifyPrestationsTotal($batch, $relatedBatchIds),
-            $this->verifyDuplicatePayments($batch, $relatedBatchIds),
-            $this->verifyOrphanInvoices($batch, $relatedBatchIds),
-            $this->verifyFutureInvoices($batch, $relatedBatchIds),
+        $rules = [
+            ['code' => 'tva_coherence', 'label' => 'Coherence TVA', 'run' => fn () => $this->verifyVatCoherence($batch, $relatedBatchIds)],
+            ['code' => 'payment_balance', 'label' => 'Equilibre des paiements', 'run' => fn () => $this->verifyPaymentBalance($batch, $relatedBatchIds)],
+            ['code' => 'negative_amounts', 'label' => 'Montants negatifs', 'run' => fn () => $this->verifyNegativeAmounts($batch, $relatedBatchIds)],
+            ['code' => 'overpaid_invoices', 'label' => 'Factures sur-payees', 'run' => fn () => $this->verifyOverpaidInvoices($batch, $relatedBatchIds)],
+            ['code' => 'prestations_total', 'label' => 'Total des prestations', 'run' => fn () => $this->verifyPrestationsTotal($batch, $relatedBatchIds)],
+            ['code' => 'duplicate_payments', 'label' => 'Paiements en doublon', 'run' => fn () => $this->verifyDuplicatePayments($batch, $relatedBatchIds)],
+            ['code' => 'orphan_invoices', 'label' => 'Factures orphelines', 'run' => fn () => $this->verifyOrphanInvoices($batch, $relatedBatchIds)],
+            ['code' => 'future_invoice_date', 'label' => 'Dates futures', 'run' => fn () => $this->verifyFutureInvoices($batch, $relatedBatchIds)],
         ];
+
+        $results = [];
+        $totalRules = count($rules);
+
+        foreach ($rules as $index => $rule) {
+            $this->reportProgress($progress, $index + 1, $totalRules, $rule['code'], $rule['label']);
+            $ruleStartedAt = microtime(true);
+
+            try {
+                $results[] = $rule['run']();
+            } catch (\Throwable $e) {
+                Log::channel('imports')->error('Import verification rule failed', [
+                    'import_batch_id' => $batch?->id,
+                    'related_batch_ids' => $relatedBatchIds,
+                    'rule_code' => $rule['code'],
+                    'duration_ms' => (int) round((microtime(true) - $ruleStartedAt) * 1000),
+                    'message' => $e->getMessage(),
+                ]);
+
+                throw $e;
+            }
+        }
 
         $this->flushInvoiceStatuses();
 
@@ -59,11 +92,13 @@ class ImportVerificationService
             'info' => collect($results)->where('severity', 'info')->sum('affected_count'),
             'affected_invoices' => count($this->invoiceIssues),
             'score' => $this->healthScore(),
+            'verified_at' => now()->toIso8601String(),
         ];
 
         Log::channel('imports')->info('Import verification completed', [
             'import_batch_id' => $batch?->id,
             'related_batch_ids' => $relatedBatchIds,
+            'scoped_invoice_count' => $this->scopedInvoiceCount,
             'duration_ms' => (int) round((microtime(true) - $startedAt) * 1000),
             'summary' => $summary,
         ]);
@@ -108,11 +143,16 @@ class ImportVerificationService
         $score = $total > 0 ? max(0, (int) round(($ok / $total) * 100)) : 100;
 
         $latestByRule = ImportVerification::query()
+            ->whereNull('import_batch_id')
             ->select('rule_code', 'affected_count', 'details', 'created_at')
             ->latest('id')
             ->get()
             ->unique('rule_code')
             ->keyBy('rule_code');
+        $lastVerifiedAt = DB::table('factures')
+            ->whereNull('deleted_at')
+            ->whereNotNull('last_verified_at')
+            ->max('last_verified_at');
 
         return [
             'score' => $score,
@@ -124,7 +164,7 @@ class ImportVerificationService
             'overpaid_invoices' => (int) ($latestByRule['overpaid_invoices']->affected_count ?? 0),
             'payment_mismatches' => (int) ($latestByRule['payment_balance']->affected_count ?? 0),
             'total_detected_delta' => (float) ($latestByRule['tva_coherence']->details['total_delta'] ?? 0),
-            'last_verified_at' => optional($latestByRule->first())->created_at,
+            'last_verified_at' => $lastVerifiedAt ? Carbon::parse($lastVerifiedAt) : optional($latestByRule->first())->created_at,
         ];
     }
 
@@ -132,7 +172,8 @@ class ImportVerificationService
     {
         $query = DB::table('factures')
             ->whereNull('deleted_at')
-            ->whereRaw('ABS(total_ttc - ROUND(total_ht * ?, 2)) > ?', [self::TVA_RATE, self::MONEY_TOLERANCE]);
+            ->whereRaw('ABS(total_ttc - ROUND(total_ht * ?, 2)) > '.self::SQL_NUMERIC_CAST, [self::TVA_RATE, self::MONEY_TOLERANCE]);
+        $query = $this->applyInvoiceScope($query);
 
         return $this->persistInvoiceRule(
             batch: $batch,
@@ -152,7 +193,7 @@ class ImportVerificationService
     private function verifyPaymentBalance(?ImportBatch $batch, array $relatedBatchIds): array
     {
         $query = $this->facturesWithPaidTotals()
-            ->whereRaw('ABS(factures.reste_a_payer - (factures.total_ttc - COALESCE(payments.paid_total, 0))) > ?', [self::MONEY_TOLERANCE]);
+            ->whereRaw('ABS(factures.reste_a_payer - (factures.total_ttc - COALESCE(payments.paid_total, 0))) > '.self::SQL_NUMERIC_CAST, [self::MONEY_TOLERANCE]);
 
         return $this->persistInvoiceRule(
             batch: $batch,
@@ -178,21 +219,24 @@ class ImportVerificationService
                     ->orWhere('total_tva', '<', 0)
                     ->orWhere('total_ttc', '<', 0)
                     ->orWhere('reste_a_payer', '<', 0);
-            })
+            });
+        $factureIds = $this->applyInvoiceScope($factureIds)
             ->pluck('id')
             ->map(fn ($id) => (int) $id)
             ->all();
 
-        $paiementInvoiceIds = DB::table('paiements')
+        $paiementInvoiceQuery = DB::table('paiements')
             ->join('factures', 'factures.id', '=', 'paiements.facture_id')
             ->whereNull('factures.deleted_at')
-            ->where('paiements.montant', '<', 0)
+            ->whereNull('paiements.deleted_at')
+            ->where('paiements.montant', '<', 0);
+        $paiementInvoiceIds = $this->applyInvoiceScope($paiementInvoiceQuery)
             ->distinct()
             ->pluck('factures.id')
             ->map(fn ($id) => (int) $id)
             ->all();
 
-        $prestationInvoiceIds = DB::table('prestations')
+        $prestationInvoiceQuery = DB::table('prestations')
             ->join('factures', 'factures.id', '=', 'prestations.facture_id')
             ->whereNull('factures.deleted_at')
             ->where(function (Builder $query) {
@@ -201,7 +245,8 @@ class ImportVerificationService
                     ->orWhere('prestations.total_ttc', '<', 0)
                     ->orWhere('prestations.prix_unitaire', '<', 0)
                     ->orWhere('prestations.quantite', '<', 0);
-            })
+            });
+        $prestationInvoiceIds = $this->applyInvoiceScope($prestationInvoiceQuery)
             ->distinct()
             ->pluck('factures.id')
             ->map(fn ($id) => (int) $id)
@@ -228,7 +273,7 @@ class ImportVerificationService
     private function verifyOverpaidInvoices(?ImportBatch $batch, array $relatedBatchIds): array
     {
         $query = $this->facturesWithPaidTotals()
-            ->whereRaw('COALESCE(payments.paid_total, 0) - factures.total_ttc > ?', [self::MONEY_TOLERANCE]);
+            ->whereRaw('COALESCE(payments.paid_total, 0) - factures.total_ttc > '.self::SQL_NUMERIC_CAST, [self::MONEY_TOLERANCE]);
 
         return $this->persistInvoiceRule(
             batch: $batch,
@@ -254,7 +299,8 @@ class ImportVerificationService
         $query = DB::table('factures')
             ->joinSub($prestations, 'prestations_sum', 'prestations_sum.facture_id', '=', 'factures.id')
             ->whereNull('factures.deleted_at')
-            ->whereRaw('ABS(prestations_sum.prestation_total - factures.total_ttc) > ?', [self::PRESTATION_TOLERANCE]);
+            ->whereRaw('ABS(prestations_sum.prestation_total - factures.total_ttc) > '.self::SQL_NUMERIC_CAST, [self::PRESTATION_TOLERANCE]);
+        $query = $this->applyInvoiceScope($query);
 
         return $this->persistInvoiceRule(
             batch: $batch,
@@ -275,12 +321,13 @@ class ImportVerificationService
     {
         $duplicates = DB::table('paiements')
             ->select('recu', 'date_paiement', 'montant')
+            ->whereNull('deleted_at')
             ->whereNotNull('recu')
             ->where('recu', '<>', '')
             ->groupBy('recu', 'date_paiement', 'montant')
             ->havingRaw('COUNT(*) > 1');
 
-        $ids = DB::table('paiements')
+        $duplicatePaymentQuery = DB::table('paiements')
             ->joinSub($duplicates, 'duplicates', function ($join) {
                 $join->on('duplicates.recu', '=', 'paiements.recu')
                     ->on('duplicates.date_paiement', '=', 'paiements.date_paiement')
@@ -288,6 +335,8 @@ class ImportVerificationService
             })
             ->join('factures', 'factures.id', '=', 'paiements.facture_id')
             ->whereNull('factures.deleted_at')
+            ->whereNull('paiements.deleted_at');
+        $ids = $this->applyInvoiceScope($duplicatePaymentQuery)
             ->distinct()
             ->pluck('factures.id')
             ->map(fn ($id) => (int) $id)
@@ -314,6 +363,7 @@ class ImportVerificationService
             ->where(function (Builder $query) {
                 $query->whereNull('factures.client_id')->orWhereNull('clients.id');
             });
+        $query = $this->applyInvoiceScope($query);
 
         return $this->persistInvoiceRule(
             batch: $batch,
@@ -331,6 +381,7 @@ class ImportVerificationService
         $query = DB::table('factures')
             ->whereNull('deleted_at')
             ->whereDate('date_facture', '>', now()->toDateString());
+        $query = $this->applyInvoiceScope($query);
 
         return $this->persistInvoiceRule(
             batch: $batch,
@@ -347,12 +398,13 @@ class ImportVerificationService
     {
         $payments = DB::table('paiements')
             ->select('facture_id', DB::raw('COALESCE(SUM(montant), 0) AS paid_total'))
+            ->whereNull('deleted_at')
             ->groupBy('facture_id');
 
-        return DB::table('factures')
+        return $this->applyInvoiceScope(DB::table('factures')
             ->leftJoinSub($payments, 'payments', 'payments.facture_id', '=', 'factures.id')
             ->whereNull('factures.deleted_at')
-            ->where('factures.annuler', 0);
+            ->where('factures.annuler', 0));
     }
 
     private function persistInvoiceRule(
@@ -415,8 +467,9 @@ class ImportVerificationService
 
     private function resetInvoiceStatuses(): void
     {
-        DB::table('factures')
-            ->whereNull('deleted_at')
+        $query = DB::table('factures')->whereNull('deleted_at');
+
+        $this->applyInvoiceScope($query)
             ->update([
                 'verification_status' => 'ok',
                 'verification_flags' => null,
@@ -467,6 +520,84 @@ class ImportVerificationService
         }
     }
 
+    private function assertVerificationSchemaReady(): void
+    {
+        $missing = [];
+
+        foreach (['factures', 'paiements', 'prestations', 'clients', 'import_verifications'] as $table) {
+            if (! Schema::hasTable($table)) {
+                $missing[] = "table {$table}";
+            }
+        }
+
+        foreach (['verification_status', 'verification_flags', 'last_verified_at'] as $column) {
+            if (! Schema::hasColumn('factures', $column)) {
+                $missing[] = "factures.{$column}";
+            }
+        }
+
+        if ($missing !== []) {
+            throw new \RuntimeException('Schema de verification incomplet: '.implode(', ', $missing).'. Lancez les migrations.');
+        }
+    }
+
+    private function prepareInvoiceScope(?ImportBatch $batch, array $relatedBatchIds): void
+    {
+        $this->scopedBatchIds = $this->resolveScopedBatchIds($batch, $relatedBatchIds);
+        $this->scopeIsEmpty = false;
+        $this->scopedInvoiceCount = null;
+
+        if ($this->scopedBatchIds === null) {
+            return;
+        }
+
+        $this->scopedInvoiceCount = (int) DB::table('import_batch_factures')
+            ->whereIn('import_batch_id', $this->scopedBatchIds)
+            ->distinct()
+            ->count('facture_id');
+        $this->scopeIsEmpty = $this->scopedInvoiceCount === 0;
+    }
+
+    /**
+     * @return array<int>|null
+     */
+    private function resolveScopedBatchIds(?ImportBatch $batch, array $relatedBatchIds): ?array
+    {
+        if (! Schema::hasTable('import_batch_factures')) {
+            return null;
+        }
+
+        $batchIds = array_values(array_unique(array_filter([
+            ...$relatedBatchIds,
+            $batch?->id,
+        ])));
+
+        if ($batchIds === []) {
+            return null;
+        }
+
+        return $batchIds;
+    }
+
+    private function applyInvoiceScope(Builder $query, string $column = 'factures.id'): Builder
+    {
+        if ($this->scopedBatchIds === null) {
+            return $query;
+        }
+
+        if ($this->scopeIsEmpty) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->whereExists(function (Builder $subquery) use ($column) {
+            $subquery
+                ->selectRaw('1')
+                ->from('import_batch_factures')
+                ->whereIn('import_batch_factures.import_batch_id', $this->scopedBatchIds)
+                ->whereColumn('import_batch_factures.facture_id', $column);
+        });
+    }
+
     private function maxSeverity(string $left, string $right): string
     {
         return self::SEVERITY_WEIGHT[$right] > self::SEVERITY_WEIGHT[$left] ? $right : $left;
@@ -474,7 +605,8 @@ class ImportVerificationService
 
     private function healthScore(): int
     {
-        $total = (int) DB::table('factures')->whereNull('deleted_at')->count();
+        $totalQuery = DB::table('factures')->whereNull('deleted_at');
+        $total = (int) $this->applyInvoiceScope($totalQuery)->count();
 
         if ($total === 0) {
             return 100;
@@ -485,5 +617,20 @@ class ImportVerificationService
         $penalty = ($critical * 2) + $warning;
 
         return max(0, (int) round(100 - (($penalty / $total) * 100)));
+    }
+
+    private function reportProgress(?callable $progress, int $currentRule, int $totalRules, string $ruleCode, string $ruleLabel): void
+    {
+        if ($progress === null) {
+            return;
+        }
+
+        $progress([
+            'current_rule' => $ruleCode,
+            'current_rule_label' => $ruleLabel,
+            'current_step' => $currentRule,
+            'total_steps' => $totalRules,
+            'percentage' => max(1, (int) floor((($currentRule - 1) / $totalRules) * 100)),
+        ]);
     }
 }

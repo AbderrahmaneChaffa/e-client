@@ -3,6 +3,8 @@
 namespace App\Imports;
 
 use App\Imports\Concerns\ParsesExcelData;
+use App\Imports\Concerns\LoadsExistingImportState;
+use App\Imports\Concerns\TracksImportTouchedFactures;
 use App\Models\{Client, Facture, ImportBatch};
 use App\Services\ImportRowHasher;
 use Illuminate\Support\Collection;
@@ -28,11 +30,12 @@ class PaiementsImport extends StringValueBinder implements
     SkipsOnError,
     SkipsOnFailure
 {
-    use Importable, SkipsErrors, SkipsFailures, ParsesExcelData;
+    use Importable, SkipsErrors, SkipsFailures, ParsesExcelData, LoadsExistingImportState, TracksImportTouchedFactures;
 
     private int $localCount = 0;
     private int $skippedCount = 0;
     private array $factureCache = [];
+    private array $clientIdCache = [];
     private array $missingFactures = [];
 
     public function __construct(private readonly ImportBatch $batch)
@@ -54,39 +57,23 @@ class PaiementsImport extends StringValueBinder implements
             ->values()
             ->all();
 
-        $newNumeros = array_diff($numeros, array_keys($this->factureCache));
+        $this->preloadFactureIds($numeros, $this->factureCache);
 
-        if ($newNumeros !== []) {
-            Facture::whereIn('numero_facture', $newNumeros)
-                ->select('id', 'numero_facture')
-                ->get()
-                ->each(fn ($facture) => $this->factureCache[$facture->numero_facture] = $facture->id);
-        }
-
-        $factureIds = [];
-        $recus = [];
+        $pairs = [];
 
         foreach ($rows as $row) {
             $numero = trim((string) $this->cellValue($row, 'facture', ''));
             $recu = trim((string) $this->cellValue($row, 'recu', ''));
 
             if ($numero !== '' && $recu !== '' && isset($this->factureCache[$numero])) {
-                $factureIds[] = $this->factureCache[$numero];
-                $recus[] = $recu;
+                $pairs[] = [
+                    'facture_id' => $this->factureCache[$numero],
+                    'key' => $recu,
+                ];
             }
         }
 
-        $existingHashes = [];
-        if ($factureIds !== [] && $recus !== []) {
-            DB::table('paiements')
-                ->whereIn('facture_id', array_values(array_unique($factureIds)))
-                ->whereIn('recu', array_values(array_unique($recus)))
-                ->select('facture_id', 'recu', 'row_hash')
-                ->get()
-                ->each(function ($row) use (&$existingHashes) {
-                    $existingHashes[$row->facture_id.'|'.$row->recu] = $row->row_hash ?? '__EXISTS_NO_HASH__';
-                });
-        }
+        $existingHashes = $this->existingHashesForFacturePairs('paiements', 'recu', $pairs);
 
         $now = now()->toDateTimeString();
         $userId = $this->batch->created_by;
@@ -192,6 +179,8 @@ class PaiementsImport extends StringValueBinder implements
                 "UPDATE factures SET reste_a_payer = CASE id {$cases} END WHERE id IN ({$placeholders})",
                 $allBindings
             );
+
+            $this->recordTouchedFactureIds(array_keys($soldesMAJ));
         }
 
         $processedRows = count($paiements) + $unchangedRows + $missingRows;
@@ -243,10 +232,14 @@ class PaiementsImport extends StringValueBinder implements
             return null;
         }
 
-        $client = Client::firstOrCreate(
-            ['code_client' => $codeClient],
-            ['name' => trim((string) $this->cellValue($row, 'nom_client', 'Client import paiement')) ?: 'Client import paiement']
-        );
+        if (! isset($this->clientIdCache[$codeClient])) {
+            $client = Client::firstOrCreate(
+                ['code_client' => $codeClient],
+                ['name' => trim((string) $this->cellValue($row, 'nom_client', 'Client import paiement')) ?: 'Client import paiement']
+            );
+
+            $this->clientIdCache[$codeClient] = $client->id;
+        }
 
         $date = $this->parseDate($this->cellValue($row, 'date', ''))?->toDateString() ?? now()->toDateString();
         $reste = $this->parseAmount($this->cellValue($row, 'reste', '0'));
@@ -255,7 +248,7 @@ class PaiementsImport extends StringValueBinder implements
         $factureId = DB::table('factures')->insertGetId([
             'numero_facture' => $numero,
             'date_facture' => $date,
-            'client_id' => $client->id,
+            'client_id' => $this->clientIdCache[$codeClient],
             'escale_id' => null,
             'total_ht' => $totalHt,
             'total_tva' => round($totalTtc - $totalHt, 2),

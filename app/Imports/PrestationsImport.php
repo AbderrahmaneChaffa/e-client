@@ -3,6 +3,8 @@
 namespace App\Imports;
 
 use App\Imports\Concerns\ParsesExcelData;
+use App\Imports\Concerns\LoadsExistingImportState;
+use App\Imports\Concerns\TracksImportTouchedFactures;
 use App\Models\{Facture, ImportBatch};
 use App\Services\ImportRowHasher;
 use Illuminate\Support\Collection;
@@ -28,7 +30,7 @@ class PrestationsImport extends StringValueBinder implements
     SkipsOnError,
     SkipsOnFailure
 {
-    use Importable, SkipsErrors, SkipsFailures, ParsesExcelData;
+    use Importable, SkipsErrors, SkipsFailures, ParsesExcelData, LoadsExistingImportState, TracksImportTouchedFactures;
 
     private int $localCount = 0;
     private int $skippedCount = 0;
@@ -48,47 +50,32 @@ class PrestationsImport extends StringValueBinder implements
             ->values()
             ->all();
 
-        $newNumeros = array_diff($numeros, array_keys($this->factureIdCache));
+        $this->preloadFactureIds($numeros, $this->factureIdCache);
 
-        if ($newNumeros !== []) {
-            Facture::whereIn('numero_facture', $newNumeros)
-                ->select('id', 'numero_facture')
-                ->get()
-                ->each(fn ($facture) => $this->factureIdCache[$facture->numero_facture] = $facture->id);
-        }
-
-        $factureIds = [];
-        $articles = [];
+        $pairs = [];
 
         foreach ($rows as $row) {
             $numero = trim((string) $this->cellValue($row, 'facture', ''));
             $article = trim((string) $this->cellValue($row, 'article', ''));
 
             if ($numero !== '' && $article !== '' && isset($this->factureIdCache[$numero])) {
-                $factureIds[] = $this->factureIdCache[$numero];
-                $articles[] = $article;
+                $pairs[] = [
+                    'facture_id' => $this->factureIdCache[$numero],
+                    'key' => $article,
+                ];
             }
         }
 
-        $existingHashes = [];
-        if ($factureIds !== [] && $articles !== []) {
-            DB::table('prestations')
-                ->whereIn('facture_id', array_values(array_unique($factureIds)))
-                ->whereIn('article', array_values(array_unique($articles)))
-                ->select('facture_id', 'article', 'row_hash')
-                ->get()
-                ->each(function ($row) use (&$existingHashes) {
-                    $existingHashes[$row->facture_id.'|'.$row->article] = $row->row_hash ?? '__EXISTS_NO_HASH__';
-                });
-        }
+        $existingHashes = $this->existingHashesForFacturePairs('prestations', 'article', $pairs);
 
         $now = now()->toDateTimeString();
-        $records = [];
-        $updates = [];
+        $upserts = [];
         $createdRows = 0;
         $updatedRows = 0;
         $unchangedRows = 0;
         $missingRows = 0;
+        $changedRows = 0;
+        $touchedFactureIds = [];
 
         foreach ($rows as $row) {
             $numero = trim((string) $this->cellValue($row, 'facture', ''));
@@ -136,39 +123,35 @@ class PrestationsImport extends StringValueBinder implements
                 'updated_at' => $now,
             ];
 
-            if ($existingHash) {
-                $updates[] = $record;
-                $updatedRows++;
-            } else {
-                $records[$factureId.'|'.$article] = $record;
-                $createdRows++;
-            }
+            $upserts[$factureId.'|'.$article] = $record;
+            $existingHash ? $updatedRows++ : $createdRows++;
+            $changedRows++;
+            $touchedFactureIds[$factureId] = $factureId;
 
             $this->localCount++;
         }
 
-        if ($records !== []) {
-            DB::table('prestations')->insert(array_values($records));
+        if ($upserts !== []) {
+            DB::table('prestations')->upsert(
+                array_values($upserts),
+                ['facture_id', 'article'],
+                [
+                    'libelle',
+                    'quantite',
+                    'prix_unitaire',
+                    'taux_ht',
+                    'total_ht',
+                    'total_tva',
+                    'total_ttc',
+                    'row_hash',
+                    'updated_at',
+                ]
+            );
+
+            $this->recordTouchedFactureIds($touchedFactureIds);
         }
 
-        foreach ($updates as $record) {
-            DB::table('prestations')
-                ->where('facture_id', $record['facture_id'])
-                ->where('article', $record['article'])
-                ->update([
-                    'libelle' => $record['libelle'],
-                    'quantite' => $record['quantite'],
-                    'prix_unitaire' => $record['prix_unitaire'],
-                    'taux_ht' => $record['taux_ht'],
-                    'total_ht' => $record['total_ht'],
-                    'total_tva' => $record['total_tva'],
-                    'total_ttc' => $record['total_ttc'],
-                    'row_hash' => $record['row_hash'],
-                    'updated_at' => $record['updated_at'],
-                ]);
-        }
-
-        $processedRows = count($records) + count($updates) + $unchangedRows + $missingRows;
+        $processedRows = $changedRows + $unchangedRows + $missingRows;
         Cache::increment("import_batch_{$this->batch->id}", $processedRows);
         $this->batch->increment('processed_rows', $processedRows);
         $this->batch->increment('created_rows', $createdRows);

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 
 class ImportRowHasher
@@ -94,7 +95,7 @@ class ImportRowHasher
     {
         $value = preg_replace('/\s+/u', ' ', trim((string) $value)) ?? '';
 
-        return strtolower($value);
+        return strtolower(Str::ascii($value));
     }
 
     private static function compoundKey(mixed $left, mixed $right): ?string

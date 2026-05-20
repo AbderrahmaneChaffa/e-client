@@ -12,6 +12,7 @@ class ImportBatch extends Model
         'type',
         'original_filename',
         'stored_path',
+        'file_hash',
         'status',
         'total_rows',
         'processed_rows',

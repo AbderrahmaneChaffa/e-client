@@ -44,15 +44,37 @@ class Facture extends Model
     protected $casts = [
         'date_facture' => 'date',
         'date_echeance' => 'date',
+        'annuler' => 'boolean',
+        'imprimer' => 'boolean',
         'needs_review' => 'boolean',
         'verification_flags' => 'array',
         'last_verified_at' => 'datetime',
     ];
 
     // Filtre pour les factures impayées (Utilisé pour l'affichage client)
+    public function scopeActive(Builder $query): void
+    {
+        $query->where('annuler', false);
+    }
+
+    public function scopeCanceled(Builder $query): void
+    {
+        $query->where('annuler', true);
+    }
+
+    public function scopePaid(Builder $query): void
+    {
+        $query->active()->where('reste_a_payer', '<=', 0);
+    }
+
+    public function scopeUnpaid(Builder $query): void
+    {
+        $query->active()->where('reste_a_payer', '>', 0);
+    }
+
     public function scopeImpayees(Builder $query): void
     {
-        $query->where('reste_a_payer', '>', 0);
+        $query->unpaid();
     }
 
     public function scopeWithVerificationIssues(Builder $query): void

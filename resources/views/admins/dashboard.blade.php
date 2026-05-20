@@ -174,7 +174,15 @@
         </div>
     </div>
 
-    <div class="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-5 shadow-sm mb-8">
+    <div class="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-5 shadow-sm mb-8"
+         x-data="globalVerification({
+            verifyUrl: @js(route('admin.imports.verify-global')),
+            statusUrl: @js(route('admin.imports.verify-global.status')),
+            csrf: @js(csrf_token()),
+            initialStatus: @js($verificationStatus),
+            initialHealth: @js($dataHealth),
+         })"
+         x-init="init()">
         <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div>
                 <h3 class="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
@@ -182,14 +190,21 @@
                     Integrite des donnees
                 </h3>
                 <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    Derniere verification: {{ $dataHealth['last_verified_at']?->format('d/m/Y H:i') ?? 'jamais' }}
+                    Derniere verification: <span x-text="formatDate(health.last_verified_at)">{{ $dataHealth['last_verified_at']?->format('d/m/Y H:i') ?? 'jamais' }}</span>
+                </p>
+                <p class="text-xs mt-2" :class="statusClass()" x-show="message" x-cloak>
+                    <i class="fa-solid" :class="statusIcon()"></i>
+                    <span x-text="message"></span>
+                    <span x-show="currentRuleLabel">- <span x-text="currentRuleLabel"></span></span>
+                    <span x-show="percentage !== null">(<span x-text="percentage"></span>%)</span>
                 </p>
             </div>
-            <form x-data="{loading:false}" @submit="loading=true" method="POST" action="{{ route('admin.imports.verify-global') }}">
+            <form method="POST" action="{{ route('admin.imports.verify-global') }}" @submit.prevent="start">
                 @csrf
                 <button type="submit"
-                    class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold">
-                    <i class="fa-solid fa-rotate" :class="loading ? 'fa-spin' : ''"></i>
+                    :disabled="isBusy()"
+                    class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-xs font-semibold">
+                    <i class="fa-solid fa-rotate" :class="isBusy() ? 'fa-spin' : ''"></i>
                     Lancer une verification globale
                 </button>
             </form>
@@ -197,25 +212,25 @@
         <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mt-5">
             <div>
                 <p class="text-xs text-gray-500 dark:text-gray-400">Score global</p>
-                <p class="text-2xl font-bold {{ $dataHealth['score'] >= 95 ? 'text-emerald-600' : ($dataHealth['score'] >= 80 ? 'text-amber-600' : 'text-red-600') }}">
-                    {{ $dataHealth['score'] }}%
+                <p class="text-2xl font-bold" :class="scoreClass()">
+                    <span x-text="health.score">{{ $dataHealth['score'] }}</span>%
                 </p>
             </div>
             <div>
                 <p class="text-xs text-gray-500 dark:text-gray-400">TVA</p>
-                <p class="text-lg font-bold text-gray-900 dark:text-white">{{ number_format($dataHealth['tva_anomalies'], 0, ',', ' ') }}</p>
+                <p class="text-lg font-bold text-gray-900 dark:text-white" x-text="formatInteger(health.tva_anomalies)">{{ number_format($dataHealth['tva_anomalies'], 0, ',', ' ') }}</p>
             </div>
             <div>
                 <p class="text-xs text-gray-500 dark:text-gray-400">Sur-payees</p>
-                <p class="text-lg font-bold text-gray-900 dark:text-white">{{ number_format($dataHealth['overpaid_invoices'], 0, ',', ' ') }}</p>
+                <p class="text-lg font-bold text-gray-900 dark:text-white" x-text="formatInteger(health.overpaid_invoices)">{{ number_format($dataHealth['overpaid_invoices'], 0, ',', ' ') }}</p>
             </div>
             <div>
                 <p class="text-xs text-gray-500 dark:text-gray-400">Paiements incoherents</p>
-                <p class="text-lg font-bold text-gray-900 dark:text-white">{{ number_format($dataHealth['payment_mismatches'], 0, ',', ' ') }}</p>
+                <p class="text-lg font-bold text-gray-900 dark:text-white" x-text="formatInteger(health.payment_mismatches)">{{ number_format($dataHealth['payment_mismatches'], 0, ',', ' ') }}</p>
             </div>
             <div>
                 <p class="text-xs text-gray-500 dark:text-gray-400">Ecart detecte</p>
-                <p class="text-lg font-bold text-gray-900 dark:text-white">{{ number_format($dataHealth['total_detected_delta'], 2, ',', ' ') }} DA</p>
+                <p class="text-lg font-bold text-gray-900 dark:text-white"><span x-text="formatAmount(health.total_detected_delta)">{{ number_format($dataHealth['total_detected_delta'], 2, ',', ' ') }}</span> DA</p>
             </div>
         </div>
     </div>
@@ -638,6 +653,181 @@
 
 
 <script>
+function globalVerification(config) {
+    return {
+        verifyUrl: config.verifyUrl,
+        statusUrl: config.statusUrl,
+        csrf: config.csrf,
+        status: config.initialStatus?.status || 'idle',
+        message: config.initialStatus?.message || null,
+        percentage: config.initialStatus?.percentage ?? null,
+        currentRuleLabel: config.initialStatus?.current_rule_label || null,
+        health: config.initialHealth || {},
+        pollingInterval: null,
+
+        init() {
+            if (this.isBusy()) {
+                this.startPolling();
+            }
+        },
+
+        isBusy() {
+            return ['queued', 'processing', 'retrying'].includes(this.status);
+        },
+
+        async start() {
+            if (this.isBusy()) {
+                return;
+            }
+
+            this.applyStatus({
+                status: 'queued',
+                message: 'Verification globale ajoutee a la file.',
+                percentage: 0,
+            });
+
+            try {
+                const res = await fetch(this.verifyUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': this.csrf,
+                    },
+                });
+                const data = await res.json().catch(() => ({}));
+
+                if (!res.ok) {
+                    this.applyStatus(data.status || {
+                        status: 'failed',
+                        message: data.message || 'Impossible de lancer la verification.',
+                    });
+                    return;
+                }
+
+                this.applyStatus(data.status || {
+                    status: 'queued',
+                    message: data.message || 'Verification globale lancee.',
+                    percentage: 0,
+                });
+                this.startPolling();
+            } catch (err) {
+                this.applyStatus({
+                    status: 'failed',
+                    message: 'Erreur reseau: ' + err.message,
+                });
+            }
+        },
+
+        startPolling() {
+            if (this.pollingInterval) {
+                return;
+            }
+
+            this.fetchStatus();
+            this.pollingInterval = setInterval(() => this.fetchStatus(), 2000);
+        },
+
+        stopPolling() {
+            if (!this.pollingInterval) {
+                return;
+            }
+
+            clearInterval(this.pollingInterval);
+            this.pollingInterval = null;
+        },
+
+        async fetchStatus() {
+            try {
+                const res = await fetch(this.statusUrl, {
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                });
+                const data = await res.json();
+
+                if (data.health) {
+                    this.health = data.health;
+                }
+
+                if (data.status) {
+                    this.applyStatus(data.status);
+                }
+
+                if (!this.isBusy()) {
+                    this.stopPolling();
+                }
+            } catch (err) {
+                this.applyStatus({
+                    status: 'failed',
+                    message: 'Suivi indisponible: ' + err.message,
+                });
+                this.stopPolling();
+            }
+        },
+
+        applyStatus(status) {
+            this.status = status.status || 'idle';
+            this.message = status.message || null;
+            this.percentage = status.percentage ?? null;
+            this.currentRuleLabel = status.current_rule_label || null;
+        },
+
+        scoreClass() {
+            const score = Number(this.health.score || 0);
+
+            if (score >= 95) return 'text-emerald-600';
+            if (score >= 80) return 'text-amber-600';
+            return 'text-red-600';
+        },
+
+        statusClass() {
+            if (this.status === 'completed') return 'text-emerald-600 dark:text-emerald-400';
+            if (this.status === 'failed') return 'text-red-600 dark:text-red-400';
+            if (this.status === 'retrying') return 'text-amber-600 dark:text-amber-400';
+            return 'text-blue-600 dark:text-blue-400';
+        },
+
+        statusIcon() {
+            if (this.status === 'completed') return 'fa-circle-check';
+            if (this.status === 'failed') return 'fa-circle-xmark';
+            if (this.status === 'retrying') return 'fa-triangle-exclamation';
+            return 'fa-spinner fa-spin';
+        },
+
+        formatDate(value) {
+            if (!value) {
+                return 'jamais';
+            }
+
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) {
+                return value;
+            }
+
+            return date.toLocaleString('fr-DZ', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+            });
+        },
+
+        formatInteger(value) {
+            return Number(value || 0).toLocaleString('fr-DZ', { maximumFractionDigits: 0 });
+        },
+
+        formatAmount(value) {
+            return Number(value || 0).toLocaleString('fr-DZ', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            });
+        },
+    };
+}
+
 document.addEventListener('DOMContentLoaded', function () {
 
     const isDark = document.documentElement.classList.contains('dark');

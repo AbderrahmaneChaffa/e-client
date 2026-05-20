@@ -307,7 +307,7 @@ return [
     |
     */
     'transactions' => [
-        'handler' => 'db',
+        'handler' => env('EXCEL_IMPORT_TRANSACTION_HANDLER', 'null') ?: 'null',
         'db'      => [
             'connection' => null,
         ],

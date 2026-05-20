@@ -8,9 +8,10 @@ use App\Jobs\VerifyImportJob;
 use App\Models\ImportBatch;
 use App\Services\ExcelTypeDetector;
 use App\Services\ImportPreviewService;
+use App\Services\ImportVerificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\{Auth, Bus, Cache, Schema, Storage};
+use Illuminate\Support\Facades\{Auth, Bus, Cache, Log, Schema, Storage};
 use Illuminate\View\View;
 
 class ImportController extends Controller
@@ -106,18 +107,22 @@ class ImportController extends Controller
                 ], 422);
             }
 
+            $fileHash = sha1_file($file->getRealPath()) ?: null;
             $path = $file->store("imports/{$type}", 'local');
 
             $batch = ImportBatch::create([
                 'type' => $type,
                 'original_filename' => $file->getClientOriginalName(),
                 'stored_path' => $path,
+                'file_hash' => $fileHash,
                 'status' => 'pending',
                 'force_import' => $forceImport,
                 'metadata' => [
                     'detected_type' => $inspection['type'],
                     'confidence' => $inspection['confidence'],
                     'found_headers' => $inspection['found_headers'],
+                    'file_hash' => $fileHash,
+                    'file_size' => $file->getSize(),
                     'uploaded_mode' => $request->hasFile('files') ? 'adaptive' : 'legacy',
                 ],
                 'created_by' => Auth::id(),
@@ -144,11 +149,51 @@ class ImportController extends Controller
 
     public function progress(ImportBatch $batch): JsonResponse
     {
-        $cached = (int) Cache::get("import_batch_{$batch->id}", 0);
-        $processed = max($cached, $batch->processed_rows);
-        $total = $batch->total_rows;
+        return response()->json($this->progressPayload($batch->fresh()));
+    }
+
+    public function progressMany(Request $request): JsonResponse
+    {
+        $ids = collect(explode(',', (string) $request->query('ids', '')))
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $progress = ImportBatch::query()
+            ->when($ids !== [], fn ($query) => $query->whereIn('id', $ids), fn ($query) => $query->whereRaw('1 = 0'))
+            ->get()
+            ->mapWithKeys(fn (ImportBatch $batch) => [$batch->id => $this->progressPayload($batch)])
+            ->all();
+
+        $history = ImportBatch::with('creator')
+            ->latest()
+            ->limit(20)
+            ->get()
+            ->map(fn (ImportBatch $batch) => $this->historyPayload($batch))
+            ->values()
+            ->all();
 
         return response()->json([
+            'progress' => $progress,
+            'history' => $history,
+            'server_time' => now()->toIso8601String(),
+        ]);
+    }
+
+    private function progressPayload(ImportBatch $batch): array
+    {
+        $cached = (int) Cache::get("import_batch_{$batch->id}", 0);
+        $processed = max($cached, (int) $batch->processed_rows);
+        $total = (int) $batch->total_rows;
+        $elapsed = $batch->started_at ? max(1, now()->diffInSeconds($batch->started_at)) : 0;
+        $rate = $elapsed > 0 && $processed > 0 ? $processed / $elapsed : 0;
+        $remaining = max(0, $total - $processed);
+        $etaSeconds = $rate > 0 && $batch->status === 'processing' ? (int) ceil($remaining / $rate) : null;
+
+        return [
+            'id' => $batch->id,
             'status' => $batch->status,
             'processed' => $processed,
             'total' => $total,
@@ -156,12 +201,73 @@ class ImportController extends Controller
             'created' => $batch->created_rows,
             'updated' => $batch->updated_rows,
             'skipped' => $batch->skipped_rows,
-            'percentage' => $total > 0 ? min(100, (int) round($processed / $total * 100)) : 0,
+            'percentage' => $total > 0 ? min(100, (int) round($processed / $total * 100)) : ($batch->status === 'completed' ? 100 : 0),
             'started_at' => $batch->started_at?->diffForHumans(),
             'completed_at' => $batch->completed_at?->format('d/m/Y H:i:s'),
+            'elapsed_seconds' => $elapsed,
+            'rows_per_second' => $rate > 0 ? round($rate, 2) : 0,
+            'eta_seconds' => $etaSeconds,
+            'eta' => $etaSeconds !== null ? $this->humanDuration($etaSeconds) : null,
             'type' => $batch->type,
+            'sync_mode' => data_get($batch->metadata, 'sync_mode'),
+            'skipped_duplicate_of' => data_get($batch->metadata, 'skipped_duplicate_of'),
             'verification' => Cache::get("import_verification_{$batch->id}", ['status' => 'pending']),
-        ]);
+        ];
+    }
+
+    private function historyPayload(ImportBatch $batch): array
+    {
+        $progress = $this->progressPayload($batch);
+
+        return [
+            ...$progress,
+            'filename' => $batch->original_filename,
+            'type_label' => $this->typeLabel($batch->type),
+            'status_label' => $this->statusLabel($batch->status),
+            'created_date' => $batch->created_at?->format('d/m/Y'),
+            'created_time' => $batch->created_at?->format('H:i'),
+            'creator' => $batch->creator?->name ?? '-',
+            'can_delete' => in_array($batch->status, ['completed', 'failed', 'pending'], true),
+        ];
+    }
+
+    private function typeLabel(string $type): string
+    {
+        return [
+            'factures' => 'Factures',
+            'prestations' => 'Prestations',
+            'paiements' => 'Paiements',
+            'factures_payees' => 'Factures Payees',
+            'prestations_payees' => 'Prestations Payees',
+        ][$type] ?? ucfirst($type);
+    }
+
+    private function statusLabel(string $status): string
+    {
+        return [
+            'pending' => 'En attente',
+            'processing' => 'En cours',
+            'completed' => 'Termine',
+            'failed' => 'Echec',
+        ][$status] ?? $status;
+    }
+
+    private function humanDuration(int $seconds): string
+    {
+        if ($seconds < 60) {
+            return $seconds.'s';
+        }
+
+        $minutes = intdiv($seconds, 60);
+        $remainingSeconds = $seconds % 60;
+
+        if ($minutes < 60) {
+            return $minutes.'m '.str_pad((string) $remainingSeconds, 2, '0', STR_PAD_LEFT).'s';
+        }
+
+        $hours = intdiv($minutes, 60);
+
+        return $hours.'h '.str_pad((string) ($minutes % 60), 2, '0', STR_PAD_LEFT).'m';
     }
 
     public function resume(ImportBatch $batch): JsonResponse
@@ -190,13 +296,87 @@ class ImportController extends Controller
 
     public function verifyGlobal(Request $request)
     {
-        VerifyImportJob::dispatch(null, [])->onQueue('imports');
+        $startedAt = now();
+        $lockTtl = now()->addHours(2);
 
-        if (! $request->expectsJson()) {
-            return back()->with('status', 'Verification globale lancee en arriere-plan.');
+        if (! Cache::add(VerifyImportJob::GLOBAL_LOCK_CACHE_KEY, [
+            'started_at' => $startedAt->toIso8601String(),
+            'user_id' => Auth::id(),
+        ], $lockTtl)) {
+            $status = Cache::get(VerifyImportJob::GLOBAL_STATUS_CACHE_KEY, ['status' => 'processing']);
+            $message = 'Une verification globale est deja en cours.';
+
+            if (! $request->expectsJson()) {
+                return back()->with('error', $message);
+            }
+
+            return response()->json([
+                'message' => $message,
+                'status' => $status,
+            ], 409);
         }
 
-        return response()->json(['message' => 'Verification globale lancee en arriere-plan.']);
+        Cache::put(VerifyImportJob::GLOBAL_STATUS_CACHE_KEY, [
+            'status' => 'queued',
+            'message' => 'Verification globale ajoutee a la file.',
+            'percentage' => 0,
+            'started_at' => $startedAt->toIso8601String(),
+            'updated_at' => $startedAt->toIso8601String(),
+            'user_id' => Auth::id(),
+        ], now()->addHours(2));
+
+        try {
+            VerifyImportJob::dispatch(null, [])->onQueue('imports');
+        } catch (\Throwable $e) {
+            Cache::forget(VerifyImportJob::GLOBAL_LOCK_CACHE_KEY);
+            Cache::put(VerifyImportJob::GLOBAL_STATUS_CACHE_KEY, [
+                'status' => 'failed',
+                'message' => $e->getMessage(),
+                'failed_at' => now()->toIso8601String(),
+                'updated_at' => now()->toIso8601String(),
+                'user_id' => Auth::id(),
+            ], now()->addDay());
+
+            Log::channel('imports')->error('Global import verification dispatch failed', [
+                'user_id' => Auth::id(),
+                'message' => $e->getMessage(),
+            ]);
+
+            if (! $request->expectsJson()) {
+                return back()->with('error', 'Impossible de lancer la verification globale: '.$e->getMessage());
+            }
+
+            return response()->json(['message' => $e->getMessage()], 500);
+        }
+
+        Log::channel('imports')->info('Global import verification dispatched', [
+            'user_id' => Auth::id(),
+            'queued_at' => $startedAt->toIso8601String(),
+        ]);
+
+        if (! $request->expectsJson()) {
+            return back()->with('success', 'Verification globale lancee en arriere-plan.');
+        }
+
+        return response()->json([
+            'message' => 'Verification globale lancee en arriere-plan.',
+            'status' => Cache::get(VerifyImportJob::GLOBAL_STATUS_CACHE_KEY),
+        ]);
+    }
+
+    public function verifyGlobalStatus(ImportVerificationService $verifier): JsonResponse
+    {
+        $status = Cache::get(VerifyImportJob::GLOBAL_STATUS_CACHE_KEY, [
+            'status' => 'idle',
+            'message' => null,
+            'percentage' => null,
+        ]);
+
+        return response()->json([
+            'status' => $status,
+            'health' => $verifier->latestHealthSummary(),
+            'server_time' => now()->toIso8601String(),
+        ]);
     }
 
     public function destroy(ImportBatch $batch): JsonResponse

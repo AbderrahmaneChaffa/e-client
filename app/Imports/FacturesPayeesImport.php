@@ -3,21 +3,23 @@
 namespace App\Imports;
 
 use App\Imports\Concerns\ParsesExcelData;
-use App\Models\{Client, Escale, Facture, ImportBatch, Navire};
+use App\Imports\Concerns\ResolvesInvoiceImportRelations;
+use App\Imports\Concerns\TracksImportTouchedFactures;
+use App\Models\Facture;
+use App\Models\ImportBatch;
 use App\Services\ImportRowHasher;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\{Cache, DB};
-use Maatwebsite\Excel\Concerns\{
-    Importable,
-    SkipsErrors,
-    SkipsFailures,
-    SkipsOnError,
-    SkipsOnFailure,
-    ToCollection,
-    WithChunkReading,
-    WithCustomValueBinder,
-    WithHeadingRow,
-};
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Maatwebsite\Excel\Concerns\Importable;
+use Maatwebsite\Excel\Concerns\SkipsErrors;
+use Maatwebsite\Excel\Concerns\SkipsFailures;
+use Maatwebsite\Excel\Concerns\SkipsOnError;
+use Maatwebsite\Excel\Concerns\SkipsOnFailure;
+use Maatwebsite\Excel\Concerns\ToCollection;
+use Maatwebsite\Excel\Concerns\WithChunkReading;
+use Maatwebsite\Excel\Concerns\WithCustomValueBinder;
+use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use PhpOffice\PhpSpreadsheet\Cell\StringValueBinder;
 
 class FacturesPayeesImport extends StringValueBinder implements
@@ -28,16 +30,17 @@ class FacturesPayeesImport extends StringValueBinder implements
     SkipsOnError,
     SkipsOnFailure
 {
-    use Importable, SkipsErrors, SkipsFailures, ParsesExcelData;
+    use Importable;
+    use SkipsErrors;
+    use SkipsFailures;
+    use ParsesExcelData;
+    use ResolvesInvoiceImportRelations;
+    use TracksImportTouchedFactures;
 
     private int $localCount = 0;
     private int $createdCount = 0;
     private int $updatedCount = 0;
     private int $skippedCount = 0;
-
-    private array $clientCache = [];
-    private array $navireCache = [];
-    private array $escaleCache = [];
 
     public function __construct(private readonly ImportBatch $batch)
     {
@@ -55,18 +58,25 @@ class FacturesPayeesImport extends StringValueBinder implements
             ->values()
             ->all();
 
-        $existingHashes = Facture::whereIn('numero_facture', $numeros)
-            ->pluck('row_hash', 'numero_facture')
-            ->map(fn ($hash) => $hash ?? '__EXISTS_NO_HASH__')
+        $existingFactures = Facture::whereIn('numero_facture', $numeros)
+            ->get(['numero_facture', 'row_hash', 'annuler'])
+            ->keyBy('numero_facture');
+
+        $existingHashes = $existingFactures
+            ->map(fn (Facture $facture) => $facture->row_hash ?? '__EXISTS_NO_HASH__')
             ->all();
 
+        $this->resolveInvoiceImportRelations($rows);
+
         $records = [];
+        $changedNumeros = [];
         $createdRows = 0;
         $updatedRows = 0;
         $unchangedRows = 0;
 
         foreach ($rows as $row) {
             $numero = trim((string) $this->cellValue($row, 'facture', ''));
+
             if ($numero === '') {
                 continue;
             }
@@ -85,57 +95,17 @@ class FacturesPayeesImport extends StringValueBinder implements
                 continue;
             }
 
-            $clientId = null;
-            $codeClient = trim((string) $this->cellValue($row, 'code_client', ''));
-
-            if ($codeClient !== '') {
-                if (! isset($this->clientCache[$codeClient])) {
-                    $this->clientCache[$codeClient] = Client::firstOrCreate(
-                        ['code_client' => $codeClient],
-                        [
-                            'name' => trim((string) $this->cellValue($row, 'nom_client', '')),
-                            'adresse' => trim((string) $this->cellValue($row, 'adresse', '')),
-                            'rc' => trim((string) $this->cellValue($row, 'rc', '')),
-                            'nis' => trim((string) $this->cellValue($row, 'nis', '')),
-                            'ai' => trim((string) $this->cellValue($row, 'ai', '')),
-                            'nif' => trim((string) $this->cellValue($row, 'nif', '')),
-                        ]
-                    );
-                }
-
-                $clientId = $this->clientCache[$codeClient]->id;
-            }
-
-            $navireNom = trim((string) $this->cellValue($row, 'navire', 'NAVIRE INCONNU'));
-            $pavillon = trim((string) $this->cellValue($row, 'pavillon', 'INCONNU'));
-            $navireKey = $navireNom.'|'.$pavillon;
-
-            if (! isset($this->navireCache[$navireKey])) {
-                $this->navireCache[$navireKey] = Navire::firstOrCreate([
-                    'nom' => $navireNom,
-                    'pavillon' => $pavillon,
-                ]);
-            }
-
-            $navire = $this->navireCache[$navireKey];
-
-            if (! isset($this->escaleCache[$navire->id])) {
-                $this->escaleCache[$navire->id] = Escale::firstOrCreate(
-                    ['navire_id' => $navire->id],
-                    [
-                        'date_arrivee' => $this->parseDate($this->cellValue($row, 'entree', '')),
-                        'date_sortie' => $this->parseDate($this->cellValue($row, 'sortie', '')),
-                    ]
-                );
-            }
-
             $existingHash ? $updatedRows++ : $createdRows++;
             $existingHash ? $this->updatedCount++ : $this->createdCount++;
+            $changedNumeros[$numero] = true;
+            $annuler = $this->hasCellHeading($row, 'annule')
+                ? $this->parseBooleanFlag($this->cellValue($row, 'annule', '0'))
+                : (bool) ($existingFactures->get($numero)?->annuler ?? false);
 
             $records[] = [
                 'numero_facture' => $numero,
-                'client_id' => $clientId,
-                'escale_id' => $this->escaleCache[$navire->id]->id,
+                'client_id' => $this->clientIdForInvoiceImportRow($row),
+                'escale_id' => $this->escaleIdForInvoiceImportRow($row),
                 'date_facture' => $this->parseDate($this->cellValue($row, 'date', '')),
                 'bordereau' => trim((string) $this->cellValue($row, 'bordereau', '')),
                 'description' => trim((string) $this->cellValue($row, 'description', '')),
@@ -147,7 +117,7 @@ class FacturesPayeesImport extends StringValueBinder implements
                 'devise' => trim((string) $this->cellValue($row, 'devise', 'DA')),
                 'taux_devise' => $this->parseAmount($this->cellValue($row, 'taux_devise', '1')),
                 'mode_paiement' => trim((string) $this->cellValue($row, 'paiement', '')),
-                'annuler' => 0,
+                'annuler' => $annuler ? 1 : 0,
                 'row_hash' => $rowHash,
                 'created_by' => $userId,
                 'created_at' => $now,
@@ -179,6 +149,10 @@ class FacturesPayeesImport extends StringValueBinder implements
                     'row_hash',
                     'updated_at',
                 ]
+            );
+
+            $this->recordTouchedFactureIds(
+                Facture::whereIn('numero_facture', array_keys($changedNumeros))->pluck('id')->all()
             );
         }
 

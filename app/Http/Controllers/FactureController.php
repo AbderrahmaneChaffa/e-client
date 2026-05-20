@@ -27,9 +27,9 @@ class FactureController extends Controller
 
         if ($request->filled('statut')) {
             match($request->statut) {
-                'paye'    => $query->where('annuler', 0)->where('reste_a_payer', '<=', 0),
-                'impaye'  => $query->where('annuler', 0)->where('reste_a_payer', '>', 0),
-                'annulee' => $query->where('annuler', 1),
+                'paye'    => $query->paid(),
+                'impaye'  => $query->unpaid(),
+                'annulee' => $query->canceled(),
                 default   => null,
             };
         }
@@ -87,13 +87,24 @@ class FactureController extends Controller
             $statsQuery->whereDate('date_facture', '<=', $request->date_to);
         }
 
+        $statusStats = (clone $statsQuery)
+            ->selectRaw('
+                COALESCE(SUM(CASE WHEN annuler = 0 THEN total_ht ELSE 0 END), 0) AS total_ht,
+                COALESCE(SUM(CASE WHEN annuler = 0 THEN total_ttc ELSE 0 END), 0) AS total_ttc,
+                COALESCE(SUM(CASE WHEN annuler = 0 THEN reste_a_payer ELSE 0 END), 0) AS reste_total,
+                SUM(CASE WHEN annuler = 0 AND reste_a_payer <= 0 THEN 1 ELSE 0 END) AS count_payees,
+                SUM(CASE WHEN annuler = 0 AND reste_a_payer > 0 THEN 1 ELSE 0 END) AS count_impayees,
+                SUM(CASE WHEN annuler = 1 THEN 1 ELSE 0 END) AS count_annulees
+            ')
+            ->first();
+
         $stats = [
-            'total_ht'       => (clone $statsQuery)->where('annuler', 0)->sum('total_ht'),
-            'total_ttc'      => (clone $statsQuery)->where('annuler', 0)->sum('total_ttc'),
-            'reste_total'    => (clone $statsQuery)->where('annuler', 0)->sum('reste_a_payer'),
-            'count_payees'   => (clone $statsQuery)->where('annuler', 0)->where('reste_a_payer', '<=', 0)->count(),
-            'count_impayees' => (clone $statsQuery)->where('annuler', 0)->where('reste_a_payer', '>', 0)->count(),
-            'count_annulees' => (clone $statsQuery)->where('annuler', 1)->count(),
+            'total_ht'       => (float) ($statusStats->total_ht ?? 0),
+            'total_ttc'      => (float) ($statusStats->total_ttc ?? 0),
+            'reste_total'    => (float) ($statusStats->reste_total ?? 0),
+            'count_payees'   => (int) ($statusStats->count_payees ?? 0),
+            'count_impayees' => (int) ($statusStats->count_impayees ?? 0),
+            'count_annulees' => (int) ($statusStats->count_annulees ?? 0),
             'count_anomalies' => $hasVerificationColumns ? (clone $statsQuery)->whereIn('verification_status', ['warning', 'critical'])->count() : 0,
             'count_critical' => $hasVerificationColumns ? (clone $statsQuery)->where('verification_status', 'critical')->count() : 0,
         ];

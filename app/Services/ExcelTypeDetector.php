@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Str;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Reader\IReadFilter;
 use RuntimeException;
@@ -126,6 +127,7 @@ class ExcelTypeDetector
             'Ç' => 'C', 'ç' => 'c',
         ]);
 
+        $header = Str::ascii($header);
         $header = strtolower($header);
         $header = preg_replace('/[^a-z0-9]+/', '_', $header) ?? $header;
 

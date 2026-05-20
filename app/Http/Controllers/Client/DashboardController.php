@@ -15,7 +15,7 @@ class DashboardController extends Controller
 
         // ── Stats financières (montant_paye n'existe pas) ─────────────────
         $stats = Facture::where('client_id', $clientId)
-            ->where('annuler', 0)
+            ->active()
             ->selectRaw('
                 COUNT(*)                          AS total_count,
                 SUM(total_ttc)                    AS total_facture,
@@ -38,11 +38,11 @@ class DashboardController extends Controller
 
         // ── Compteurs statuts ─────────────────────────────────────────────
         $paidCount = Facture::where('client_id', $clientId)
-            ->where('annuler', 0)->where('reste_a_payer', '<=', 0)->count();
+            ->paid()->count();
         $unpaidCount = Facture::where('client_id', $clientId)
-            ->where('annuler', 0)->where('reste_a_payer', '>', 0)->count();
+            ->unpaid()->count();
         $canceledCount = Facture::where('client_id', $clientId)
-            ->where('annuler', 1)->count();
+            ->canceled()->count();
 
         // ── Graphique mensuel — 12 mois ────────────────────────────────────
         $monthlyRaw = Paiement::selectRaw('
@@ -54,7 +54,7 @@ class DashboardController extends Controller
             ->whereHas(
                 'facture',
                 fn($q) =>
-                $q->where('client_id', $clientId)->where('annuler', 0)
+                $q->where('client_id', $clientId)->active()
             )
             ->whereNotNull('date_paiement')
             ->where('date_paiement', '>=', now()->subMonths(12)->startOfMonth())
@@ -81,7 +81,7 @@ class DashboardController extends Controller
         // ── Factures récentes ─────────────────────────────────────────────
         $recentInvoices = Facture::with('escale')
             ->where('client_id', $clientId)
-            ->where('annuler', 0)
+            ->active()
             ->orderByDesc('date_facture')
             ->take(6)
             ->get();
@@ -91,7 +91,7 @@ class DashboardController extends Controller
             ->whereHas(
                 'facture',
                 fn($q) =>
-                $q->where('client_id', $clientId)->where('annuler', 0)
+                $q->where('client_id', $clientId)->active()
             )
             ->whereNotNull('date_paiement')
             ->orderByDesc('date_paiement')
@@ -100,8 +100,7 @@ class DashboardController extends Controller
 
         // ── Factures impayées les plus anciennes (alertes) ────────────────
         $facturesEnRetard = Facture::where('client_id', $clientId)
-            ->where('annuler', 0)
-            ->where('reste_a_payer', '>', 0)
+            ->unpaid()
             ->orderBy('date_facture')
             ->take(5)
             ->get();

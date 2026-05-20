@@ -269,9 +269,13 @@
                     <h2 class="text-base font-bold text-gray-900 dark:text-white">Apercu pre-import</h2>
                     <p class="text-xs text-gray-500 dark:text-gray-400">
                         <span x-text="previewReport?.summary?.rows ?? 0"></span> lignes detectees,
+                        <span x-text="previewReport?.summary?.scanned_rows ?? 0"></span> analysees,
                         <span x-text="previewReport?.summary?.created ?? 0"></span> nouvelles,
                         <span x-text="previewReport?.summary?.updated ?? 0"></span> mises a jour,
                         <span x-text="previewReport?.summary?.skipped ?? 0"></span> ignorees.
+                        <span x-show="previewReport?.summary?.impact_is_estimate" class="text-amber-600">
+                            Estimation rapide.
+                        </span>
                     </p>
                 </div>
                 <span class="px-2 py-1 rounded-full text-xs font-semibold"
@@ -288,6 +292,7 @@
                                 <p class="text-xs text-gray-500 dark:text-gray-400">
                                     Type: <span x-text="file.type"></span> -
                                     Lignes: <span x-text="file.row_count"></span> -
+                                    Analysees: <span x-text="file.scanned_rows"></span> -
                                     TTC: <span x-text="formatAmount(file.totals?.total_ttc ?? 0)"></span> DA
                                 </p>
                             </div>
@@ -409,6 +414,12 @@
                     <span x-show="prog.status === 'pending'" class="text-gray-400 dark:text-gray-500 italic">
                         En attente du job précédent…
                     </span>
+
+                    <span x-show="prog.status === 'processing' && prog.eta" class="text-gray-500 dark:text-gray-400 tabular-nums">
+                        <i class="fa-solid fa-stopwatch mr-1"></i>
+                        ETA <span x-text="prog.eta"></span>
+                        <span x-show="prog.rows_per_second">(<span x-text="prog.rows_per_second"></span> lignes/s)</span>
+                    </span>
                 </div>
             </div>
         </template>
@@ -441,7 +452,7 @@
                             <th class="px-5 py-3 text-center hidden md:table-cell">Action</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                    <tbody id="import-history-body" class="divide-y divide-gray-100 dark:divide-gray-700">
                         @forelse($batches as $batch)
                             @php
                                 $typeColors = [
@@ -636,6 +647,7 @@
 
                 isProcessing: false,
                 pollingInterval: null,
+                historyPollingInterval: null,
 
                 batchIds: {
                     factures: null,
@@ -671,7 +683,10 @@
                 },
 
                 // ── Init ──────────────────────────────────────────────────────────
-                init() { },
+                init() {
+                    this.refreshHistory();
+                    this.historyPollingInterval = setInterval(() => this.refreshHistory(), 5000);
+                },
 
                 setAdaptiveFiles(event) {
                     this.adaptiveFiles = Array.from(event.target.files || []).slice(0, 5);
@@ -774,25 +789,54 @@
 
                 // ── Polling ───────────────────────────────────────────────────────
                 startPolling() {
+                    if (this.pollingInterval) clearInterval(this.pollingInterval);
+                    this.fetchAllProgress();
                     this.pollingInterval = setInterval(() => this.fetchAllProgress(), 2000);
                 },
 
                 async fetchAllProgress() {
-                    const types = [
-                        'factures', 'prestations', 'paiements',
-                        'factures_payees', 'prestations_payees',
-                    ];
+                    const ids = Object.values(this.batchIds).filter(Boolean).join(',');
+                    const data = await this.fetchProgressSnapshot(ids);
 
-                    await Promise.all(
-                        types
-                            .filter(t => this.batchIds[t] !== null)
-                            .map(t => this.fetchProgress(t))
-                    );
+                    for (const [type, id] of Object.entries(this.batchIds)) {
+                        if (!id || !data.progress?.[id]) continue;
+
+                        this.progresses[type] = {
+                            ...this.progresses[type],
+                            ...data.progress[id],
+                            visible: true,
+                        };
+                    }
+
+                    if (data.history) this.renderHistoryRows(data.history);
 
                     if (this.allDone) {
                         clearInterval(this.pollingInterval);
+                        this.pollingInterval = null;
                         this.isProcessing = false;
-                        setTimeout(() => window.location.reload(), 2000);
+                        this.refreshHistory();
+                    }
+                },
+
+                async refreshHistory() {
+                    const data = await this.fetchProgressSnapshot('');
+                    if (data.history) this.renderHistoryRows(data.history);
+                },
+
+                async fetchProgressSnapshot(ids) {
+                    const url = ids
+                        ? `{{ route("admin.imports.progress-many") }}?ids=${encodeURIComponent(ids)}`
+                        : `{{ route("admin.imports.progress-many") }}`;
+
+                    try {
+                        const res = await fetch(url, {
+                            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                        });
+
+                        return res.ok ? await res.json() : { progress: {}, history: null };
+                    } catch (err) {
+                        console.error('Polling imports :', err);
+                        return { progress: {}, history: null };
                     }
                 },
 
@@ -815,8 +859,105 @@
                     }
                 },
 
+                renderHistoryRows(rows) {
+                    const tbody = document.getElementById('import-history-body');
+                    if (!tbody) return;
+
+                    if (!rows.length) {
+                        tbody.innerHTML = `
+                            <tr>
+                                <td colspan="8" class="px-5 py-12 text-center">
+                                    <i class="fa-solid fa-inbox text-4xl text-gray-200 dark:text-gray-600 mb-3 block"></i>
+                                    <p class="text-gray-400 dark:text-gray-500 text-sm">Aucun import effectue.</p>
+                                </td>
+                            </tr>`;
+                        return;
+                    }
+
+                    tbody.innerHTML = rows.map(row => {
+                        const pct = Number(row.percentage || 0);
+                        const deleteAction = row.can_delete
+                            ? `<button onclick="deleteBatch(${row.id}, '${this.escapeJs(row.filename)}')" class="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all" title="Supprimer"><i class="fa-solid fa-trash text-sm"></i></button>`
+                            : `<span class="p-1.5 text-gray-200 dark:text-gray-600 cursor-not-allowed" title="Import en cours"><i class="fa-solid fa-trash text-sm"></i></span>`;
+
+                        return `
+                            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
+                                <td class="px-5 py-3 max-w-[180px]">
+                                    <span class="font-mono text-xs text-gray-700 dark:text-gray-300 block truncate" title="${this.escapeHtml(row.filename)}">${this.escapeHtml(row.filename)}</span>
+                                </td>
+                                <td class="px-5 py-3">
+                                    <span class="px-2 py-0.5 rounded-full text-xs font-medium ${this.typeClass(row.type)}">${this.escapeHtml(row.type_label)}</span>
+                                </td>
+                                <td class="px-5 py-3">
+                                    <div class="flex flex-col gap-1">
+                                        <span class="px-2 py-0.5 rounded-full text-xs font-medium w-fit ${this.statusClass(row.status)}">${this.escapeHtml(row.status_label)}</span>
+                                        <div class="w-20 h-1 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
+                                            <div class="h-1 rounded-full ${row.status === 'completed' ? 'bg-green-500' : row.status === 'failed' ? 'bg-red-500' : 'bg-blue-400'}" style="width: ${pct}%"></div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-5 py-3 text-right tabular-nums">
+                                    <span class="font-medium text-gray-800 dark:text-gray-200 text-xs">${this.num(row.processed)}</span>
+                                    <span class="text-gray-400 text-xs">/ ${this.num(row.total)} lignes</span>
+                                    <div class="text-[10px] text-gray-400 mt-1">+${this.num(row.created)} / ~${this.num(row.updated)} / =${this.num(row.skipped)}</div>
+                                </td>
+                                <td class="px-5 py-3 text-right hidden md:table-cell">
+                                    ${row.failed > 0 ? `<span class="text-red-500 text-xs font-medium tabular-nums">${this.num(row.failed)}</span>` : '<span class="text-gray-300 dark:text-gray-600 text-xs">-</span>'}
+                                </td>
+                                <td class="px-5 py-3 hidden sm:table-cell">
+                                    <span class="text-gray-500 dark:text-gray-400 text-xs tabular-nums">${this.escapeHtml(row.created_date || '')}</span>
+                                    <span class="text-gray-400 dark:text-gray-500 text-xs block">${this.escapeHtml(row.created_time || '')}</span>
+                                </td>
+                                <td class="px-5 py-3 hidden md:table-cell">
+                                    <span class="text-gray-500 dark:text-gray-400 text-xs">${this.escapeHtml(row.creator || '-')}</span>
+                                </td>
+                                <td class="px-5 py-3 text-center hidden md:table-cell">${deleteAction}</td>
+                            </tr>`;
+                    }).join('');
+                },
+
+                num(value) {
+                    return Number(value || 0).toLocaleString('fr-FR');
+                },
+
+                typeClass(type) {
+                    return {
+                        factures: 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200',
+                        prestations: 'bg-teal-100 text-teal-800 dark:bg-teal-900/50 dark:text-teal-200',
+                        paiements: 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-200',
+                        factures_payees: 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-200',
+                        prestations_payees: 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-200',
+                    }[type] || 'bg-gray-100 text-gray-600';
+                },
+
+                statusClass(status) {
+                    return {
+                        pending: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300',
+                        processing: 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300',
+                        completed: 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300',
+                        failed: 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300',
+                    }[status] || 'bg-gray-100 text-gray-600';
+                },
+
+                escapeHtml(value) {
+                    return String(value ?? '')
+                        .replace(/&/g, '&amp;')
+                        .replace(/</g, '&lt;')
+                        .replace(/>/g, '&gt;')
+                        .replace(/"/g, '&quot;')
+                        .replace(/'/g, '&#039;');
+                },
+
+                escapeJs(value) {
+                    return String(value ?? '')
+                        .replace(/\\/g, '\\\\')
+                        .replace(/'/g, "\\'")
+                        .replace(/\n/g, ' ');
+                },
+
                 destroy() {
                     if (this.pollingInterval) clearInterval(this.pollingInterval);
+                    if (this.historyPollingInterval) clearInterval(this.historyPollingInterval);
                 },
             };
         }

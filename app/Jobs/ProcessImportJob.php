@@ -2,27 +2,36 @@
 
 namespace App\Jobs;
 
-use App\Imports\{
-    FacturesImport,
-    FacturesPayeesImport,
-    PaiementsImport,
-    PrestationsImport,
-    PrestationsPayeesImport,
-};
-use App\Models\{Client, Escale, Facture, ImportBatch, Navire, Paiement, Prestation};
+use App\Imports\FacturesImport;
+use App\Imports\FacturesPayeesImport;
+use App\Imports\PaiementsImport;
+use App\Imports\PrestationsImport;
+use App\Imports\PrestationsPayeesImport;
+use App\Models\Client;
+use App\Models\Escale;
+use App\Models\Facture;
+use App\Models\ImportBatch;
+use App\Models\Navire;
+use App\Models\Paiement;
+use App\Models\Prestation;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\{Cache, DB, Log};
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Laravel\Telescope\Telescope;
 use Maatwebsite\Excel\Facades\Excel;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class ProcessImportJob implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable;
+    use InteractsWithQueue;
+    use Queueable;
+    use SerializesModels;
 
     public int $timeout = 7200;
     public int $tries = 1;
@@ -37,7 +46,7 @@ class ProcessImportJob implements ShouldQueue
 
         $batch = ImportBatch::findOrFail($this->batchId);
         $timings = [];
-        $t = microtime(true);
+        $startedAt = microtime(true);
         $eventDispatchers = [];
         $wasTelescopeRecording = class_exists(Telescope::class) ? Telescope::isRecording() : false;
 
@@ -46,6 +55,10 @@ class ProcessImportJob implements ShouldQueue
         }
 
         try {
+            if ($this->completeFromPreviousIdenticalImport($batch)) {
+                return;
+            }
+
             $this->optimizeDatabaseSession();
             $eventDispatchers = $this->disableModelEvents();
 
@@ -55,9 +68,9 @@ class ProcessImportJob implements ShouldQueue
 
             $path = storage_path("app/private/{$batch->stored_path}");
 
-            $timings['start'] = microtime(true) - $t;
+            $timings['start'] = microtime(true) - $startedAt;
             $totalRows = $this->countRowsFast($path);
-            $timings['after_count'] = microtime(true) - $t;
+            $timings['after_count'] = microtime(true) - $startedAt;
 
             $batch->update([
                 'total_rows' => $totalRows,
@@ -87,26 +100,8 @@ class ProcessImportJob implements ShouldQueue
                 default => throw new \InvalidArgumentException("Type inconnu : {$batch->type}"),
             };
 
-            if (config('app.debug')) {
-                DB::enableQueryLog();
-            }
-
             Excel::import($import, $path);
-            $timings['after_import'] = microtime(true) - $t;
-
-            if (config('app.debug')) {
-                $queries = DB::getQueryLog();
-                $slow = array_filter($queries, fn ($q) => ($q['time'] ?? 0) > 100);
-
-                if (! empty($slow)) {
-                    Log::channel('imports')->warning('Requêtes lentes détectées', [
-                        'count' => count($slow),
-                        'top3' => array_slice(array_values($slow), 0, 3),
-                    ]);
-                }
-
-                DB::disableQueryLog();
-            }
+            $timings['after_import'] = microtime(true) - $startedAt;
 
             Log::channel('imports')->info("TIMING [batch #{$batch->id}] {$batch->type}", $timings);
 
@@ -115,7 +110,10 @@ class ProcessImportJob implements ShouldQueue
             }
 
             $freshBatch = $batch->fresh();
-            $finalProcessed = max((int) Cache::get("import_batch_{$batch->id}", 0), (int) $freshBatch->processed_rows);
+            $finalProcessed = max(
+                (int) Cache::get("import_batch_{$batch->id}", 0),
+                (int) $freshBatch->processed_rows,
+            );
 
             $batch->update([
                 'status' => 'completed',
@@ -123,14 +121,18 @@ class ProcessImportJob implements ShouldQueue
                 'completed_at' => now(),
             ]);
 
+            $duration = max(microtime(true) - $startedAt, 0.001);
+
             Log::channel('imports')->info('Import completed', [
                 'batch_id' => $batch->id,
                 'type' => $batch->type,
-                'duration_seconds' => round(microtime(true) - $t, 3),
-                'rows_per_second' => $finalProcessed > 0 ? round($finalProcessed / max(microtime(true) - $t, 0.001), 2) : 0,
+                'duration_seconds' => round($duration, 3),
+                'rows_per_second' => $finalProcessed > 0 ? round($finalProcessed / $duration, 2) : 0,
                 'processed_rows' => $finalProcessed,
                 'failed_rows' => $batch->fresh()->failed_rows,
             ]);
+
+            Cache::forget('dashboard_stats');
         } catch (\Throwable $e) {
             Log::channel('imports')->error("Import EPO failed [batch #{$batch->id} - {$batch->type}]", [
                 'message' => $e->getMessage(),
@@ -145,10 +147,6 @@ class ProcessImportJob implements ShouldQueue
 
             throw $e;
         } finally {
-            if (config('app.debug')) {
-                DB::disableQueryLog();
-            }
-
             $this->restoreModelEvents($eventDispatchers);
 
             if ($wasTelescopeRecording && class_exists(Telescope::class)) {
@@ -169,6 +167,53 @@ class ProcessImportJob implements ShouldQueue
         ]);
     }
 
+    private function completeFromPreviousIdenticalImport(ImportBatch $batch): bool
+    {
+        if ($batch->force_import || ! $batch->file_hash) {
+            return false;
+        }
+
+        $previous = ImportBatch::query()
+            ->where('id', '<>', $batch->id)
+            ->where('type', $batch->type)
+            ->where('file_hash', $batch->file_hash)
+            ->where('status', 'completed')
+            ->latest('completed_at')
+            ->first();
+
+        if (! $previous) {
+            return false;
+        }
+
+        $metadata = $batch->metadata ?? [];
+        $metadata['sync_mode'] = 'file_hash_skip';
+        $metadata['skipped_duplicate_of'] = $previous->id;
+
+        $batch->update([
+            'total_rows' => $previous->total_rows,
+            'processed_rows' => $previous->total_rows,
+            'failed_rows' => 0,
+            'created_rows' => 0,
+            'updated_rows' => 0,
+            'skipped_rows' => $previous->total_rows,
+            'status' => 'completed',
+            'started_at' => now(),
+            'completed_at' => now(),
+            'metadata' => $metadata,
+        ]);
+
+        Cache::put("import_batch_{$batch->id}", (int) $previous->total_rows, now()->addHour());
+
+        Log::channel('imports')->info('Import skipped because file already synchronized', [
+            'batch_id' => $batch->id,
+            'type' => $batch->type,
+            'duplicate_of' => $previous->id,
+            'rows' => $previous->total_rows,
+        ]);
+
+        return true;
+    }
+
     private function optimizeDatabaseSession(): void
     {
         if (DB::connection()->getDriverName() !== 'mysql') {
@@ -176,9 +221,6 @@ class ProcessImportJob implements ShouldQueue
         }
 
         foreach ([
-            'SET SESSION innodb_flush_log_at_trx_commit = 0',
-            'SET SESSION foreign_key_checks = 0',
-            'SET SESSION unique_checks = 0',
             'SET SESSION sql_log_bin = 0',
             'SET SESSION bulk_insert_buffer_size = 67108864',
             'SET SESSION wait_timeout = 28800',
@@ -203,9 +245,6 @@ class ProcessImportJob implements ShouldQueue
         }
 
         foreach ([
-            'SET SESSION innodb_flush_log_at_trx_commit = 1',
-            'SET SESSION foreign_key_checks = 1',
-            'SET SESSION unique_checks = 1',
             'SET SESSION sql_log_bin = 1',
         ] as $statement) {
             try {
@@ -233,7 +272,14 @@ class ProcessImportJob implements ShouldQueue
      */
     private function disableModelEvents(): array
     {
-        $models = [Facture::class, Prestation::class, Paiement::class, Client::class, Navire::class, Escale::class];
+        $models = [
+            Facture::class,
+            Prestation::class,
+            Paiement::class,
+            Client::class,
+            Navire::class,
+            Escale::class,
+        ];
         $dispatchers = [];
 
         foreach ($models as $model) {
@@ -250,7 +296,13 @@ class ProcessImportJob implements ShouldQueue
     private function restoreModelEvents(array $dispatchers): void
     {
         foreach ($dispatchers as $model => $dispatcher) {
-            $model::setEventDispatcher($dispatcher);
+            if ($dispatcher instanceof \Illuminate\Contracts\Events\Dispatcher) {
+                $model::setEventDispatcher($dispatcher);
+
+                continue;
+            }
+
+            $model::unsetEventDispatcher();
         }
     }
 }

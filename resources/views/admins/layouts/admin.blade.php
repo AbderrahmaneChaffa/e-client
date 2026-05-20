@@ -127,6 +127,18 @@
                     <span class="font-medium">{{ session('success') }}</span>
                 </div>
                 @endif
+                @if(session('status'))
+                <div class="max-w-4xl mx-auto mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400 rounded-2xl flex items-center shadow-sm">
+                    <i class="fa-solid fa-circle-info mr-3 text-xl"></i>
+                    <span class="font-medium">{{ session('status') }}</span>
+                </div>
+                @endif
+                @if(session('error'))
+                <div class="max-w-4xl mx-auto mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-2xl flex items-center shadow-sm">
+                    <i class="fa-solid fa-circle-xmark mr-3 text-xl"></i>
+                    <span class="font-medium">{{ session('error') }}</span>
+                </div>
+                @endif
 
                 <div class="max-w-7xl mx-auto">
                     @yield('content')

@@ -4,6 +4,7 @@
 namespace App\Imports\Concerns;
 
 use Carbon\Carbon;
+use Illuminate\Support\Str;
 use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 
 trait ParsesExcelData
@@ -39,6 +40,20 @@ trait ParsesExcelData
         return $default;
     }
 
+    private function hasCellHeading(mixed $row, string $heading): bool
+    {
+        $items = $row instanceof \Illuminate\Support\Collection ? $row->all() : (array) $row;
+        $normalizedHeading = $this->normalizeHeading($heading);
+
+        foreach (array_keys($items) as $key) {
+            if ($this->normalizeHeading((string) $key) === $normalizedHeading) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private function normalizeHeading(string $heading): string
     {
         $heading = trim($heading);
@@ -51,6 +66,7 @@ trait ParsesExcelData
             'Ç' => 'C', 'ç' => 'c',
         ]);
 
+        $heading = Str::ascii($heading);
         $heading = strtolower($heading);
         $heading = preg_replace('/[^a-z0-9]+/', '_', $heading) ?? $heading;
 
@@ -93,6 +109,77 @@ trait ParsesExcelData
         }
 
         return is_numeric($str) ? (float) $str : 0.0;
+    }
+
+    private function parseBooleanFlag(mixed $value): bool
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        if (is_int($value) || is_float($value)) {
+            return (float) $value != 0.0;
+        }
+
+        $token = $this->normalizeFlagToken($value);
+
+        if ($token === '') {
+            return false;
+        }
+
+        if (is_numeric($token)) {
+            return (float) $token != 0.0;
+        }
+
+        if (in_array($token, [
+            'o',
+            'oui',
+            'y',
+            'yes',
+            'true',
+            'vrai',
+            'x',
+            'annule',
+            'annulee',
+            'annulees',
+            'cancel',
+            'canceled',
+            'cancelled',
+        ], true)) {
+            return true;
+        }
+
+        if (in_array($token, [
+            'n',
+            'non',
+            'no',
+            'false',
+            'faux',
+            'actif',
+            'active',
+            'valide',
+            'valid',
+            '-',
+        ], true)) {
+            return false;
+        }
+
+        return str_contains($token, 'annul') || str_contains($token, 'cancel');
+    }
+
+    private function normalizeFlagToken(mixed $value): string
+    {
+        $token = preg_replace('/\s+/u', ' ', trim((string) $value)) ?? '';
+        $token = strtr($token, [
+            'Ã€' => 'A', 'Ã' => 'A', 'Ã‚' => 'A', 'Ã„' => 'A', 'Ã ' => 'a', 'Ã¡' => 'a', 'Ã¢' => 'a', 'Ã¤' => 'a',
+            'Ãˆ' => 'E', 'Ã‰' => 'E', 'ÃŠ' => 'E', 'Ã‹' => 'E', 'Ã¨' => 'e', 'Ã©' => 'e', 'Ãª' => 'e', 'Ã«' => 'e',
+            'ÃŒ' => 'I', 'Ã' => 'I', 'ÃŽ' => 'I', 'Ã' => 'I', 'Ã¬' => 'i', 'Ã­' => 'i', 'Ã®' => 'i', 'Ã¯' => 'i',
+            'Ã’' => 'O', 'Ã“' => 'O', 'Ã”' => 'O', 'Ã–' => 'O', 'Ã²' => 'o', 'Ã³' => 'o', 'Ã´' => 'o', 'Ã¶' => 'o',
+            'Ã™' => 'U', 'Ãš' => 'U', 'Ã›' => 'U', 'Ãœ' => 'U', 'Ã¹' => 'u', 'Ãº' => 'u', 'Ã»' => 'u', 'Ã¼' => 'u',
+            'Ã‡' => 'C', 'Ã§' => 'c',
+        ]);
+
+        return strtolower(Str::ascii($token));
     }
 
     /**
