@@ -1,17 +1,16 @@
-<x-app-layout>
-    <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-            {{ __('Dashboard') }}
-        </h2>
-    </x-slot>
+{{-- // VIEW: dashboard --}}
+{{-- // ROLE: both --}}
+{{-- // COMPONENTS: <x-page-header> --}}
+{{-- // FILTERS: none --}}
+@php
+    $pageTitle = 'Dashboard';
+@endphp
+@extends('layouts.app')
+@section('title', $pageTitle)
 
-    <div class="py-12">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                <div class="p-6 text-gray-900">
-                    {{ __("You're logged in!") }}
-                </div>
-            </div>
-        </div>
+@section('content')
+    <x-page-header title="Dashboard" subtitle="Redirection automatique selon votre role." />
+    <div class="ui-card p-6">
+        <p class="text-sm text-gray-600 dark:text-gray-400">Vous etes connecte.</p>
     </div>
-</x-app-layout>
+@endsection

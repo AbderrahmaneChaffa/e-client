@@ -1,173 +1,93 @@
-@extends('admins.layouts.admin')
+{{-- // VIEW: admin.clients.create --}}
+{{-- // ROLE: admin --}}
+{{-- // COMPONENTS: <x-page-header>, <x-input-error> --}}
+{{-- // FILTERS: none --}}
+@php
+    $pageTitle = 'Nouveau client';
+@endphp
+@extends('layouts.app')
+@section('title', $pageTitle)
 
 @section('content')
-<div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mx-auto">
-    <h2 class="text-xl font-bold text-gray-800 mb-6">
-        @if(isset($client))
-        Modifier le client
-        @else
-        Créer un nouveau client
-        @endif
-    </h2>
+<div class="space-y-6" x-data="{ submitting: false }">
+    <x-page-header
+        title="Nouveau client"
+        subtitle="Creez une fiche client avec ses informations legales et de contact."
+        :breadcrumbs="[['label' => 'Clients', 'url' => route('admin.clients.index')], ['label' => 'Creer']]"
+    />
 
-    <form action="@if(isset($client)){{ route('admin.clients.update', $client) }}@else{{ route('admin.clients.store') }}@endif" method="POST">
+    <form method="POST" action="{{ route('admin.clients.store') }}" class="space-y-6" @submit="submitting = true">
         @csrf
-        @if(isset($client))
-        @method('PUT')
-        @endif
 
-        <div class="space-y-6">
-            <!-- Code Client -->
-            <div>
-                <label for="code_client" class="block text-sm font-medium text-gray-700 mb-1">Code Client <span class="text-red-500">*</span></label>
-                <input
-                    type="text"
-                    name="code_client"
-                    id="code_client"
-                    value="{{ old('code_client', $client->code_client ?? '') }}"
-                    placeholder="Ex: C-001"
-                    {{ isset($client) ? 'readonly' : '' }}
-                    class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent @error('code_client') border-red-500 @enderror"
-                    required>
-                @error('code_client')
-                <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
-                @enderror
+        <section class="ui-card p-5">
+            <div class="mb-5">
+                <h2 class="text-base font-semibold text-gray-900 dark:text-gray-100">Informations principales</h2>
+                <p class="text-sm text-gray-600 dark:text-gray-400">Identite et reference interne du client.</p>
             </div>
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                    <label for="code_client" class="ui-label mb-1">Code client</label>
+                    <input id="code_client" name="code_client" class="ui-input" value="{{ old('code_client') }}" required>
+                    <x-input-error :messages="$errors->get('code_client')" class="mt-2" />
+                </div>
+                <div>
+                    <label for="name" class="ui-label mb-1">Nom / raison sociale</label>
+                    <input id="name" name="name" class="ui-input" value="{{ old('name') }}" required>
+                    <x-input-error :messages="$errors->get('name')" class="mt-2" />
+                </div>
+                <div>
+                    <label for="email" class="ui-label mb-1">Email</label>
+                    <input id="email" name="email" type="email" class="ui-input" value="{{ old('email') }}">
+                    <x-input-error :messages="$errors->get('email')" class="mt-2" />
+                </div>
+                <div>
+                    <label for="telephone" class="ui-label mb-1">Telephone</label>
+                    <input id="telephone" name="telephone" class="ui-input" value="{{ old('telephone') }}" placeholder="+213">
+                    <x-input-error :messages="$errors->get('telephone')" class="mt-2" />
+                </div>
+                <div class="md:col-span-2">
+                    <label for="adresse" class="ui-label mb-1">Adresse</label>
+                    <textarea id="adresse" name="adresse" rows="3" class="ui-input">{{ old('adresse') }}</textarea>
+                    <x-input-error :messages="$errors->get('adresse')" class="mt-2" />
+                </div>
+            </div>
+        </section>
 
-            <!-- Nom Client -->
-            <div>
-                <label for="name" class="block text-sm font-medium text-gray-700 mb-1">Nom du client <span class="text-red-500">*</span></label>
-                <input
-                    type="text"
-                    name="name"
-                    id="name"
-                    value="{{ old('name', $client->name ?? '') }}"
-                    placeholder="Ex: EPO Transport"
-                    class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent @error('name') border-red-500 @enderror"
-                    required>
-                @error('name')
-                <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
-                @enderror
+        <section class="ui-card p-5">
+            <div class="mb-5">
+                <h2 class="text-base font-semibold text-gray-900 dark:text-gray-100">Identifiants fiscaux</h2>
+                <p class="text-sm text-gray-600 dark:text-gray-400">Registre de commerce, NIF, NIS et article d'imposition.</p>
             </div>
-            <!-- Adresse -->
-            <div>
-                <label for="adresse" class="block text-sm font-medium text-gray-700 mb-1">Adresse</label>
-                <input
-                    type="text"
-                    name="adresse"
-                    id="adresse"
-                    value="{{ old('adresse', $client->adresse ?? '') }}"
-                    placeholder="Adresse du client"
-                    class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent @error('adresse') border-red-500 @enderror">
-                @error('adresse')
-                <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
-                @enderror
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                    <label for="rc" class="ui-label mb-1">RC</label>
+                    <input id="rc" name="rc" class="ui-input" value="{{ old('rc') }}">
+                    <x-input-error :messages="$errors->get('rc')" class="mt-2" />
+                </div>
+                <div>
+                    <label for="nif" class="ui-label mb-1">NIF</label>
+                    <input id="nif" name="nif" class="ui-input" value="{{ old('nif') }}">
+                    <x-input-error :messages="$errors->get('nif')" class="mt-2" />
+                </div>
+                <div>
+                    <label for="nis" class="ui-label mb-1">NIS</label>
+                    <input id="nis" name="nis" class="ui-input" value="{{ old('nis') }}">
+                    <x-input-error :messages="$errors->get('nis')" class="mt-2" />
+                </div>
+                <div>
+                    <label for="ai" class="ui-label mb-1">AI</label>
+                    <input id="ai" name="ai" class="ui-input" value="{{ old('ai') }}">
+                    <x-input-error :messages="$errors->get('ai')" class="mt-2" />
+                </div>
             </div>
-            <!-- Email -->
-            <div>
-                <label for="email" class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                <input
-                    type="email"
-                    name="email"
-                    id="email"
-                    value="{{ old('email', $client->email ?? '') }}"
-                    placeholder="Adresse email du client"
-                    class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent @error('email') border-red-500 @enderror">
-                @error('email')
-                <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
-                @enderror
-            </div>
-            <!-- Telephone -->
-            <div>
-                <label for="telephone" class="block text-sm font-medium text-gray-700 mb-1">Téléphone</label>
-                <input
-                    type="text"
-                    name="telephone"
-                    id="telephone"
-                    value="{{ old('telephone', $client->telephone ?? '') }}"
-                    placeholder="Numéro de téléphone du client"
-                    class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent @error('telephone') border-red-500 @enderror">
-                @error('telephone')
-                <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
-                @enderror
-            </div>
-            <!-- NIS -->
-            <div>
-                <label for="nis" class="block text-sm font-medium text-gray-700 mb-1">NIS</label>
-                <input
-                    type="text"
-                    name="nis"
-                    id="nis"
-                    value="{{ old('nis', $client->nis ?? '') }}"
-                    placeholder="Numéro d'identification statistique"
-                    class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent @error('nis') border-red-500 @enderror">
-                @error('nis')
-                <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
-                @enderror
-            </div>
-            <!-- NIF -->
-            <div>
-                <label for="nif" class="block text-sm font-medium text-gray-700 mb-1">NIF</label>
-                <input
-                    type="text"
-                    name="nif"
-                    id="nif"
-                    value="{{ old('nif', $client->nif ?? '') }}"
-                    placeholder="Numéro d'identification fiscal"
-                    class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent @error('nif') border-red-500 @enderror">
-                @error('nif')
-                <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
-                @enderror
-            </div>
+        </section>
 
-            <!-- RC -->
-            <div>
-                <label for="rc" class="block text-sm font-medium text-gray-700 mb-1">RC (Registre Commerce)</label>
-                <input
-                    type="text"
-                    name="rc"
-                    id="rc"
-                    value="{{ old('rc', $client->rc ?? '') }}"
-                    placeholder="Numéro du registre de commerce"
-                    class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent @error('rc') border-red-500 @enderror">
-                @error('rc')
-                <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
-                @enderror
-            </div>
-
-            <!-- AI -->
-            <div>
-                <label for="ai" class="block text-sm font-medium text-gray-700 mb-1">AI (Attestation Impôt)</label>
-                <input
-                    type="text"
-                    name="ai"
-                    id="ai"
-                    value="{{ old('ai', $client->ai ?? '') }}"
-                    placeholder="Numéro d'attestation d'impôt"
-                    class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent @error('ai') border-red-500 @enderror">
-                @error('ai')
-                <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
-                @enderror
-            </div>
-        </div>
-
-        <!-- Boutons d'action -->
-        <div class="mt-8 flex gap-4">
-            <button
-                type="submit"
-                class="flex-1 bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition font-medium">
-                <i class="fa-solid fa-save mr-2"></i>
-                @if(isset($client))
-                Mettre à jour
-                @else
-                Créer le client
-                @endif
+        <div class="sticky bottom-20 z-10 flex flex-col-reverse gap-3 rounded-lg border border-gray-200 bg-white/90 p-3 backdrop-blur dark:border-gray-700 dark:bg-gray-800/90 sm:bottom-4 sm:flex-row sm:justify-end">
+            <a href="{{ route('admin.clients.index') }}" class="ui-btn-secondary">Annuler</a>
+            <button type="submit" class="ui-btn-primary" :disabled="submitting">
+                <i data-lucide="loader-circle" x-show="submitting" x-cloak class="h-4 w-4 animate-spin" aria-hidden="true"></i>
+                <span x-text="submitting ? 'Traitement...' : 'Enregistrer'"></span>
             </button>
-            <a
-                href="{{ route('admin.clients.index') }}"
-                class="flex-1 bg-gray-400 text-white px-6 py-2 rounded-lg hover:bg-gray-500 transition font-medium text-center">
-                <i class="fa-solid fa-times mr-2"></i> Annuler
-            </a>
         </div>
     </form>
 </div>

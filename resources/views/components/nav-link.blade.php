@@ -1,3 +1,4 @@
+{{-- // PURPOSE: Desktop navigation link with active state. --}}
 @props(['active'])
 
 @php

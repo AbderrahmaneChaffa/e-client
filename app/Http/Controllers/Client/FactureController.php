@@ -14,8 +14,12 @@ class FactureController extends Controller
         $clientId = Auth::user()->client_id;
         $query = Facture::where('client_id', $clientId)->with('escale'); // Eager loading de l'escale pour éviter les N+1
 
-        if ($request->filled('numero')) {
-            $query->where('numero_facture', 'like', '%' . $request->numero . '%');
+        if ($request->filled('numero') || $request->filled('search')) {
+            $search = $request->input('numero', $request->input('search'));
+            $query->where(function ($q) use ($search) {
+                $q->where('numero_facture', 'like', '%' . $search . '%')
+                    ->orWhere('description', 'like', '%' . $search . '%');
+            });
         }
 
         if ($request->filled('statut')) {
@@ -26,7 +30,29 @@ class FactureController extends Controller
             }
         }
 
-        $factures = $query->orderBy('date_facture', 'desc')->paginate(100)->withQueryString();
+        if ($request->filled('date_from')) {
+            $query->whereDate('date_facture', '>=', $request->date_from);
+        }
+
+        if ($request->filled('date_to')) {
+            $query->whereDate('date_facture', '<=', $request->date_to);
+        }
+
+        if (! $request->filled('date_from') && ! $request->filled('date_to') && $request->filled('period')) {
+            match ($request->period) {
+                'today' => $query->whereDate('date_facture', today()),
+                'week' => $query->whereBetween('date_facture', [now()->startOfWeek(), now()->endOfWeek()]),
+                'month' => $query->whereBetween('date_facture', [now()->startOfMonth(), now()->endOfMonth()]),
+                default => null,
+            };
+        }
+
+        $allowedSorts = ['date_facture', 'numero_facture', 'total_ttc', 'reste_a_payer'];
+        $sortBy = in_array($request->input('sort'), $allowedSorts, true) ? $request->input('sort') : 'date_facture';
+        $sortDir = $request->input('dir') === 'asc' ? 'asc' : 'desc';
+        $perPage = min((int) $request->input('per_page', 25), 100);
+
+        $factures = $query->orderBy($sortBy, $sortDir)->paginate($perPage)->withQueryString();
 
         return view('clients.factures.index', compact('factures'));
     }

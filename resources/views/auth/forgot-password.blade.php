@@ -1,36 +1,41 @@
-<x-guest-layout>
-    <div class="login-container px-8 py-10">
-        <!-- Logo Section -->
-        <div class="logo-section">
-            <img src="{{ asset('storage/Logo/logo_epo.png') }}" alt="Logo EPO">
+{{-- // VIEW: password.request --}}
+{{-- // ROLE: both --}}
+{{-- // COMPONENTS: <x-auth-session-status>, <x-input-error> --}}
+{{-- // FILTERS: none --}}
+@php
+    $pageTitle = 'Mot de passe oublie';
+@endphp
+@extends('layouts.auth')
+@section('title', $pageTitle)
+
+@section('content')
+    <div class="ui-card p-6 sm:p-8" x-data="{ submitting: false }">
+        <div class="mb-8 text-center">
+            <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary-50 text-primary-600 dark:bg-primary-900/30 dark:text-primary-300">
+                <i data-lucide="key-round" class="h-7 w-7" aria-hidden="true"></i>
+            </div>
+            <h1 class="mt-5 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Reinitialiser le mot de passe</h1>
+            <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">Recevez un lien de reinitialisation sur votre adresse email.</p>
         </div>
 
-        <!-- Title -->
-        <h1 class="form-title">Reset Password</h1>
-        <p class="form-subtitle">Enter your email to receive a reset link</p>
+        <x-auth-session-status class="mb-4 rounded-lg border border-success-200 bg-success-50 p-3 text-sm text-success-700 dark:border-success-800 dark:bg-success-900/20 dark:text-success-200" :status="session('status')" />
 
-        <!-- Session Status -->
-        <x-auth-session-status class="mb-4" :status="session('status')" />
-
-        <form method="POST" action="{{ route('password.email') }}">
+        <form method="POST" action="{{ route('password.email') }}" class="space-y-5" @submit="submitting = true">
             @csrf
-
-            <!-- Email Address -->
-            <div class="mb-5">
-                <x-input-label for="email" :value="__('Email Address')" />
-                <x-text-input id="email" class="block mt-2 w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-indigo-500 focus:outline-none transition" type="email" name="email" :value="old('email')" required autofocus />
+            <div>
+                <label for="email" class="ui-label mb-1">Adresse email</label>
+                <input id="email" class="ui-input" type="email" name="email" value="{{ old('email') }}" required autofocus autocomplete="username">
                 <x-input-error :messages="$errors->get('email')" class="mt-2" />
             </div>
 
-            <div class="flex items-center justify-between mt-6">
-                <a class="text-sm text-indigo-600 hover:text-indigo-800 hover:underline transition" href="{{ route('login') }}">
-                    {{ __('Back to login') }}
-                </a>
-
-                <x-primary-button class="btn-login px-6 py-3 text-white font-semibold rounded-lg">
-                    {{ __('Send Reset Link') }}
-                </x-primary-button>
-            </div>
+            <button type="submit" class="ui-btn-primary w-full" :disabled="submitting">
+                <i data-lucide="loader-circle" x-show="submitting" x-cloak class="h-4 w-4 animate-spin" aria-hidden="true"></i>
+                <span x-text="submitting ? 'Envoi...' : 'Envoyer le lien'"></span>
+            </button>
         </form>
+
+        <p class="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
+            <a href="{{ route('login') }}" class="font-semibold text-primary-600 hover:text-primary-700 dark:text-primary-300">Retour a la connexion</a>
+        </p>
     </div>
-</x-guest-layout>
+@endsection

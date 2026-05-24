@@ -1,88 +1,74 @@
-<x-guest-layout>
-    <div class="login-container px-8 py-10">
-        <!-- Logo Section -->
-        <div class="logo-section flex justify-center mb-8">
-            <img src="{{ asset('storage/Logo/logo_epo.png') }}" alt="Logo EPO">
+{{-- // VIEW: login --}}
+{{-- // ROLE: both --}}
+{{-- // COMPONENTS: <x-auth-session-status>, <x-input-error> --}}
+{{-- // FILTERS: none --}}
+@php
+    $pageTitle = 'Connexion';
+@endphp
+@extends('layouts.auth')
+@section('title', $pageTitle)
+
+@section('content')
+    <div class="ui-card p-6 sm:p-8" x-data="{ showPassword: false, submitting: false }">
+        <div class="mb-8 text-center">
+            <img src="{{ asset('storage/Logo/logo_epo.png') }}" alt="Logo EPO" class="mx-auto h-16 w-16 object-contain">
+            <h1 class="mt-5 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Bienvenue</h1>
+            <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">Connectez-vous a votre compte E-Client.</p>
         </div>
 
-        <!-- Title -->
-        <!-- <h1 class="form-title">Welcome Back</h1> -->
-        <p class="form-subtitle">Sign in to your account</p>
-
-        <!-- Session Status -->
         <x-auth-session-status class="mb-4" :status="session('status')" />
 
-        <form method="POST" action="{{ route('login') }}">
+        <form method="POST" action="{{ route('login') }}" class="space-y-5" @submit="submitting = true">
             @csrf
 
-            <!-- Email Address -->
-            <div class="mb-5">
-                <x-input-label for="email" :value="__('Email Address')" />
-                <x-text-input id="email" class="block mt-2 w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-indigo-500 focus:outline-none transition" type="email" name="email" :value="old('email')" required autofocus autocomplete="username" />
+            <div>
+                <label for="email" class="ui-label mb-1">Adresse email</label>
+                <input id="email" class="ui-input" type="email" name="email" value="{{ old('email') }}" required autofocus autocomplete="username" placeholder="nom@entreprise.com">
                 <x-input-error :messages="$errors->get('email')" class="mt-2" />
             </div>
 
-            <!-- Password -->
-            <div class="mb-5">
-                <x-input-label for="password" :value="__('Password')" />
-                <div class="password-input-wrapper mt-2">
-                    <x-text-input id="password" class="block w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-indigo-500 focus:outline-none transition pr-12"
-                                    type="password"
-                                    name="password"
-                                    required autocomplete="current-password" />
-                    <span class="password-toggle" onclick="togglePassword()" title="Show/Hide Password">
-                        <i class="fas fa-eye"></i>
-                    </span>
+            <div>
+                <div class="mb-1 flex items-center justify-between gap-3">
+                    <label for="password" class="ui-label">Mot de passe</label>
+                    @if (Route::has('password.request'))
+                        <a href="{{ route('password.request') }}" class="text-sm font-medium text-primary-600 hover:text-primary-700 dark:text-primary-300">Mot de passe oublie ?</a>
+                    @endif
+                </div>
+                <div class="relative">
+                    <input id="password" class="ui-input pr-11" :type="showPassword ? 'text' : 'password'" name="password" required autocomplete="current-password" placeholder="••••••••">
+                    <button type="button" class="absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700" @click="showPassword = ! showPassword" aria-label="Afficher ou masquer le mot de passe">
+                        <i data-lucide="eye" x-show="!showPassword" class="h-4 w-4" aria-hidden="true"></i>
+                        <i data-lucide="eye-off" x-show="showPassword" x-cloak class="h-4 w-4" aria-hidden="true"></i>
+                    </button>
                 </div>
                 <x-input-error :messages="$errors->get('password')" class="mt-2" />
             </div>
 
-            <!-- Remember Me -->
-            <div class="flex items-center justify-between mb-6">
-                <label for="remember_me" class="inline-flex items-center">
-                    <input id="remember_me" type="checkbox" class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500" name="remember">
-                    <span class="ms-2 text-sm text-gray-600">{{ __('Remember me') }}</span>
-                </label>
-            </div>
+            <label for="remember_me" class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                <input id="remember_me" type="checkbox" class="rounded border-gray-300 text-primary-600 focus:ring-primary-600 dark:border-gray-700 dark:bg-gray-900" name="remember">
+                Se souvenir de moi
+            </label>
 
-            <div class="flex items-center justify-between mt-6">
-                @if (Route::has('password.request'))
-                    <a class="text-sm text-indigo-600 hover:text-indigo-800 hover:underline transition" href="{{ route('password.request') }}">
-                        {{ __('Forgot password?') }}
-                    </a>
-                @endif
-
-                <x-primary-button class="btn-login px-6 py-3 text-white font-semibold rounded-lg">
-                    {{ __('Sign In') }}
-                </x-primary-button>
-            </div>
+            <button type="submit" class="ui-btn-primary w-full" :disabled="submitting">
+                <i data-lucide="loader-circle" x-show="submitting" x-cloak class="h-4 w-4 animate-spin" aria-hidden="true"></i>
+                <span x-text="submitting ? 'Connexion...' : 'Se connecter'"></span>
+            </button>
         </form>
 
-        <!-- Register Link -->
-        <div class="mt-8 text-center border-t pt-6">
-            <p class="text-gray-600 text-sm">
-                Don't have an account? 
-                <a href="{{ route('register') }}" class="text-indigo-600 font-semibold hover:text-indigo-800 transition">
-                    Sign up now
-                </a>
-            </p>
+        <div class="my-6 flex items-center gap-3">
+            <div class="h-px flex-1 bg-gray-200 dark:bg-gray-700"></div>
+            <span class="text-xs font-medium uppercase text-gray-400">ou</span>
+            <div class="h-px flex-1 bg-gray-200 dark:bg-gray-700"></div>
         </div>
-    </div>
 
-    <script>
-        function togglePassword() {
-            const passwordInput = document.getElementById('password');
-            const toggleIcon = document.querySelector('.password-toggle i');
-            
-            if (passwordInput.type === 'password') {
-                passwordInput.type = 'text';
-                toggleIcon.classList.remove('fa-eye');
-                toggleIcon.classList.add('fa-eye-slash');
-            } else {
-                passwordInput.type = 'password';
-                toggleIcon.classList.remove('fa-eye-slash');
-                toggleIcon.classList.add('fa-eye');
-            }
-        }
-    </script>
-</x-guest-layout>
+        <button type="button" class="ui-btn-secondary w-full" disabled>
+            <i data-lucide="chrome" class="h-4 w-4" aria-hidden="true"></i>
+            Connexion Google indisponible
+        </button>
+
+        <p class="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
+            Pas encore de compte ?
+            <a href="{{ route('register') }}" class="font-semibold text-primary-600 hover:text-primary-700 dark:text-primary-300">S'inscrire</a>
+        </p>
+    </div>
+@endsection

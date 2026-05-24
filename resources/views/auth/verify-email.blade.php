@@ -1,42 +1,41 @@
-<x-guest-layout>
-    <div class="login-container px-8 py-10">
-        <!-- Logo Section -->
-        <div class="logo-section">
-            <img src="{{ asset('storage/Logo/logo_epo.png') }}" alt="Logo EPO">
-        </div>
+{{-- // VIEW: verification.notice --}}
+{{-- // ROLE: both --}}
+{{-- // COMPONENTS: <x-auth-session-status> --}}
+{{-- // FILTERS: none --}}
+@php
+    $pageTitle = 'Verification email';
+@endphp
+@extends('layouts.auth')
+@section('title', $pageTitle)
 
-        <!-- Title -->
-        <h1 class="form-title">Verify Email</h1>
-        <p class="form-subtitle">Please verify your email to continue</p>
-
-        <div class="mb-6 mt-6 p-4 bg-indigo-50 border-2 border-indigo-200 rounded-lg">
-            <p class="text-sm text-gray-700">
-                {{ __('Thanks for signing up! Before getting started, could you verify your email address by clicking on the link we just emailed to you? If you didn\'t receive the email, we will gladly send you another.') }}
-            </p>
-        </div>
-
-        @if (session('status') == 'verification-link-sent')
-            <div class="mb-6 p-4 bg-green-50 border-2 border-green-200 rounded-lg">
-                <p class="text-sm text-green-700 font-medium">
-                    {{ __('A new verification link has been sent to the email address you provided during registration.') }}
-                </p>
+@section('content')
+    <div class="ui-card p-6 sm:p-8" x-data="{ submitting: null }">
+        <div class="mb-8 text-center">
+            <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-info-50 text-info-700 dark:bg-info-900/30 dark:text-info-300">
+                <i data-lucide="mail-check" class="h-7 w-7" aria-hidden="true"></i>
             </div>
-        @endif
+            <h1 class="mt-5 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Verifiez votre email</h1>
+            <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">Un lien de verification a ete envoye. Vous pouvez demander un nouvel envoi si besoin.</p>
+        </div>
 
-        <div class="flex items-center justify-between gap-4 mt-8">
-            <form method="POST" action="{{ route('verification.send') }}" class="flex-1">
+        <x-auth-session-status class="mb-4 rounded-lg border border-success-200 bg-success-50 p-3 text-sm text-success-700 dark:border-success-800 dark:bg-success-900/20 dark:text-success-200" :status="session('status')" />
+
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <form method="POST" action="{{ route('verification.send') }}" @submit="submitting = 'send'">
                 @csrf
-                <x-primary-button class="btn-login w-full px-6 py-3 text-white font-semibold rounded-lg text-center justify-center">
-                    {{ __('Resend Verification Email') }}
-                </x-primary-button>
+                <button type="submit" class="ui-btn-primary w-full" :disabled="submitting">
+                    <i data-lucide="loader-circle" x-show="submitting === 'send'" x-cloak class="h-4 w-4 animate-spin" aria-hidden="true"></i>
+                    Renvoyer
+                </button>
             </form>
 
-            <form method="POST" action="{{ route('logout') }}" class="flex-1">
+            <form method="POST" action="{{ route('logout') }}" @submit="submitting = 'logout'">
                 @csrf
-                <button type="submit" class="w-full px-6 py-3 border-2 border-indigo-600 text-indigo-600 font-semibold rounded-lg hover:bg-indigo-50 transition">
-                    {{ __('Log Out') }}
+                <button type="submit" class="ui-btn-secondary w-full" :disabled="submitting">
+                    <i data-lucide="log-out" class="h-4 w-4" aria-hidden="true"></i>
+                    Deconnexion
                 </button>
             </form>
         </div>
     </div>
-</x-guest-layout>
+@endsection

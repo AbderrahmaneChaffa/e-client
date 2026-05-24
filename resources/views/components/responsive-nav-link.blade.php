@@ -1,3 +1,4 @@
+{{-- // PURPOSE: Mobile navigation link with active state. --}}
 @props(['active'])
 
 @php

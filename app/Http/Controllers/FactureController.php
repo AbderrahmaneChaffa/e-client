@@ -17,8 +17,13 @@ class FactureController extends Controller
         $hasVerificationColumns = Schema::hasColumn('factures', 'verification_status');
 
         // ── Filtres ──────────────────────────────────────────────────────────
-        if ($request->filled('numero')) {
-            $query->where('numero_facture', 'like', '%' . $request->numero . '%');
+        if ($request->filled('numero') || $request->filled('search')) {
+            $search = $request->input('numero', $request->input('search'));
+            $query->where(function ($q) use ($search) {
+                $q->where('numero_facture', 'like', '%' . $search . '%')
+                    ->orWhereHas('client', fn ($client) => $client->where('name', 'like', '%' . $search . '%')
+                        ->orWhere('code_client', 'like', '%' . $search . '%'));
+            });
         }
 
         if ($request->filled('client_id')) {
@@ -52,6 +57,23 @@ class FactureController extends Controller
             $query->whereDate('date_facture', '<=', $request->date_to);
         }
 
+        if (! $request->filled('date_from') && ! $request->filled('date_to') && $request->filled('period')) {
+            match ($request->period) {
+                'today' => $query->whereDate('date_facture', today()),
+                'week' => $query->whereBetween('date_facture', [now()->startOfWeek(), now()->endOfWeek()]),
+                'month' => $query->whereBetween('date_facture', [now()->startOfMonth(), now()->endOfMonth()]),
+                default => null,
+            };
+        }
+
+        if ($request->filled('amount_min')) {
+            $query->where('total_ttc', '>=', $request->amount_min);
+        }
+
+        if ($request->filled('amount_max')) {
+            $query->where('total_ttc', '<=', $request->amount_max);
+        }
+
         // ── Tri ───────────────────────────────────────────────────────────────
         match($request->get('sort_by', 'date_desc')) {
             'date_asc'     => $query->orderBy('date_facture', 'asc'),
@@ -62,14 +84,32 @@ class FactureController extends Controller
             default        => $query->orderBy('date_facture', 'desc'),
         };
 
-        $factures = $query->paginate(100)->withQueryString();
+        $perPage = min((int) $request->input('per_page', 25), 100);
+        $factures = $query->paginate($perPage)->withQueryString();
 
         // ── Stats globales (requêtes séparées sur TOUTES les factures filtrées)
         // !! Ne pas utiliser $factures->sum() : ne calcule que la page courante !!
         $statsQuery = Facture::query();
 
+        if ($request->filled('numero') || $request->filled('search')) {
+            $search = $request->input('numero', $request->input('search'));
+            $statsQuery->where(function ($q) use ($search) {
+                $q->where('numero_facture', 'like', '%' . $search . '%')
+                    ->orWhereHas('client', fn ($client) => $client->where('name', 'like', '%' . $search . '%')
+                        ->orWhere('code_client', 'like', '%' . $search . '%'));
+            });
+        }
+
         if ($request->filled('client_id')) {
             $statsQuery->where('client_id', $request->client_id);
+        }
+        if ($request->filled('statut')) {
+            match($request->statut) {
+                'paye' => $statsQuery->paid(),
+                'impaye' => $statsQuery->unpaid(),
+                'annulee' => $statsQuery->canceled(),
+                default => null,
+            };
         }
         if ($hasVerificationColumns && $request->filled('verification')) {
             match($request->verification) {
@@ -85,6 +125,20 @@ class FactureController extends Controller
         }
         if ($request->filled('date_to')) {
             $statsQuery->whereDate('date_facture', '<=', $request->date_to);
+        }
+        if (! $request->filled('date_from') && ! $request->filled('date_to') && $request->filled('period')) {
+            match ($request->period) {
+                'today' => $statsQuery->whereDate('date_facture', today()),
+                'week' => $statsQuery->whereBetween('date_facture', [now()->startOfWeek(), now()->endOfWeek()]),
+                'month' => $statsQuery->whereBetween('date_facture', [now()->startOfMonth(), now()->endOfMonth()]),
+                default => null,
+            };
+        }
+        if ($request->filled('amount_min')) {
+            $statsQuery->where('total_ttc', '>=', $request->amount_min);
+        }
+        if ($request->filled('amount_max')) {
+            $statsQuery->where('total_ttc', '<=', $request->amount_max);
         }
 
         $statusStats = (clone $statsQuery)

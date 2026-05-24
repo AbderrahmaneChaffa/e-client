@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Jobs\VerifyImportJob;
-use App\Models\{Client, Facture, ImportBatch, Paiement, User};
+use App\Models\{Client, Facture, ImportBatch, Paiement};
 use App\Services\ImportVerificationService;
 use Illuminate\Support\Facades\{Cache, DB};
 
@@ -46,12 +46,8 @@ class DashboardController extends Controller
 
         // ── Compteurs utilisateurs ────────────────────────────────────────
         $totalClients = Client::count();
-        $totalUsers = User::count();
-        $totalAdmins = User::where('role', 'admin')->count();
-        $totalClientUsers = User::where('role', 'client')->count();
 
         // ── Compteurs factures ────────────────────────────────────────────
-        $totalInvoices = (int) ($invoiceStatusStats->active_count ?? 0);
         $paidInvoices = (int) ($invoiceStatusStats->paid_count ?? 0);
         $unpaidInvoices = (int) ($invoiceStatusStats->unpaid_count ?? 0);
         $canceledInvoices = (int) ($invoiceStatusStats->canceled_count ?? 0);
@@ -73,7 +69,6 @@ class DashboardController extends Controller
         // Remplir les mois manquants avec 0
         $moisLabels = [];
         $moisAmounts = [];
-        $moisCounts = [];
 
         for ($i = 11; $i >= 0; $i--) {
             $date = now()->subMonths($i);
@@ -86,70 +81,11 @@ class DashboardController extends Controller
 
             $moisLabels[] = $date->locale('fr')->isoFormat('MMM YY');
             $moisAmounts[] = $found ? (float) $found->total : 0;
-            $moisCounts[] = $found ? (int) $found->nb_paiements : 0;
         }
 
         // ── Graphique factures par mois (6 derniers mois) ─────────────────
-        [$invoiceYearSql, $invoiceMonthSql] = $this->yearMonthSql('date_facture');
-        $facturesParMois = Facture::selectRaw("
-                {$invoiceYearSql}  AS annee,
-                {$invoiceMonthSql} AS mois,
-                COUNT(*)            AS nb,
-                SUM(total_ttc)      AS montant
-            ")
-            ->active()
-            ->where('date_facture', '>=', now()->subMonths(6)->startOfMonth())
-            ->groupByRaw("{$invoiceYearSql}, {$invoiceMonthSql}")
-            ->orderByRaw("{$invoiceYearSql}, {$invoiceMonthSql}")
-            ->get();
-
-        $facturesLabels = [];
-        $facturesMontants = [];
-
-        for ($i = 5; $i >= 0; $i--) {
-            $date = now()->subMonths($i);
-            $annee = (int) $date->format('Y');
-            $mois = (int) $date->format('n');
-
-            $found = $facturesParMois->first(
-                fn($d) => (int) $d->annee === $annee && (int) $d->mois === $mois
-            );
-
-            $facturesLabels[] = $date->locale('fr')->isoFormat('MMM YY');
-            $facturesMontants[] = $found ? (float) $found->montant : 0;
-        }
-
         // ── Top 5 débiteurs ───────────────────────────────────────────────
-        $debtorTotals = Facture::query()
-            ->unpaid()
-            ->select('client_id', DB::raw('SUM(reste_a_payer) AS total_due'))
-            ->groupBy('client_id');
-        $topDebiteurs = Client::query()
-            ->joinSub($debtorTotals, 'debts', 'debts.client_id', '=', 'clients.id')
-            ->select('clients.*')
-            ->selectRaw('debts.total_due AS factures_sum_reste_a_payer')
-            ->orderByDesc('debts.total_due')
-            ->take(5)
-            ->get();
-
         // ── Top 5 meilleurs payeurs ───────────────────────────────────────
-        $topPayeurs = Client::whereIn('id', function ($sub) {
-            $sub->select('client_id')
-                ->from('factures')
-                ->where('annuler', 0);
-        })
-            ->get()
-            ->map(function ($client) {
-                $client->montant_paye_total = DB::table('factures')
-                    ->where('client_id', $client->id)
-                    ->where('annuler', 0)
-                    ->sum(DB::raw('total_ttc - reste_a_payer'));
-                return $client;
-            })
-            ->sortByDesc('montant_paye_total')
-            ->take(5)
-            ->values();
-
         // ── Derniers imports ──────────────────────────────────────────────
         $recentImports = ImportBatch::with('creator')
             ->latest()
@@ -187,21 +123,12 @@ class DashboardController extends Controller
         return view('admins.dashboard', compact(
             'stats',
             'totalClients',
-            'totalUsers',
-            'totalAdmins',
-            'totalClientUsers',
             'recoveryRate',
-            'totalInvoices',
             'paidInvoices',
             'unpaidInvoices',
             'canceledInvoices',
             'moisLabels',
             'moisAmounts',
-            'moisCounts',
-            'facturesLabels',
-            'facturesMontants',
-            'topDebiteurs',
-            'topPayeurs',
             'recentImports',
             'recentInvoices',
             'recentPayments',

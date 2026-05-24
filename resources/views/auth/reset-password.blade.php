@@ -1,75 +1,55 @@
-<x-guest-layout>
-    <div class="login-container px-8 py-10">
-        <!-- Logo Section -->
-        <div class="logo-section">
-            <img src="{{ asset('storage/Logo/logo_epo.png') }}" alt="Logo EPO">
+{{-- // VIEW: password.reset --}}
+{{-- // ROLE: both --}}
+{{-- // COMPONENTS: <x-input-error> --}}
+{{-- // FILTERS: none --}}
+@php
+    $pageTitle = 'Nouveau mot de passe';
+@endphp
+@extends('layouts.auth')
+@section('title', $pageTitle)
+
+@section('content')
+    <div class="ui-card p-6 sm:p-8" x-data="{ showPassword: false, submitting: false }">
+        <div class="mb-8 text-center">
+            <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary-50 text-primary-600 dark:bg-primary-900/30 dark:text-primary-300">
+                <i data-lucide="lock-keyhole" class="h-7 w-7" aria-hidden="true"></i>
+            </div>
+            <h1 class="mt-5 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Choisir un nouveau mot de passe</h1>
+            <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">Votre nouveau mot de passe sera actif immediatement.</p>
         </div>
 
-        <!-- Title -->
-        <h1 class="form-title">Create New Password</h1>
-        <p class="form-subtitle">Enter your new password below</p>
-
-        <form method="POST" action="{{ route('password.store') }}">
+        <form method="POST" action="{{ route('password.store') }}" class="space-y-5" @submit="submitting = true">
             @csrf
-
-            <!-- Password Reset Token -->
             <input type="hidden" name="token" value="{{ $request->route('token') }}">
 
-            <!-- Email Address -->
-            <div class="mb-5">
-                <x-input-label for="email" :value="__('Email Address')" />
-                <x-text-input id="email" class="block mt-2 w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-indigo-500 focus:outline-none transition" type="email" name="email" :value="old('email', $request->email)" required autofocus autocomplete="username" />
+            <div>
+                <label for="email" class="ui-label mb-1">Adresse email</label>
+                <input id="email" class="ui-input" type="email" name="email" value="{{ old('email', $request->email) }}" required autofocus autocomplete="username">
                 <x-input-error :messages="$errors->get('email')" class="mt-2" />
             </div>
 
-            <!-- Password -->
-            <div class="mb-5">
-                <x-input-label for="password" :value="__('Password')" />
-                <div class="password-input-wrapper mt-2">
-                    <x-text-input id="password" class="block w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-indigo-500 focus:outline-none transition pr-12" type="password" name="password" required autocomplete="new-password" />
-                    <span class="password-toggle" onclick="togglePassword('password')" title="Show/Hide Password">
-                        <i class="fas fa-eye"></i>
-                    </span>
+            <div>
+                <label for="password" class="ui-label mb-1">Nouveau mot de passe</label>
+                <div class="relative">
+                    <input id="password" class="ui-input pr-11" :type="showPassword ? 'text' : 'password'" name="password" required autocomplete="new-password">
+                    <button type="button" class="absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700" @click="showPassword = ! showPassword" aria-label="Afficher ou masquer le mot de passe">
+                        <i data-lucide="eye" x-show="!showPassword" class="h-4 w-4" aria-hidden="true"></i>
+                        <i data-lucide="eye-off" x-show="showPassword" x-cloak class="h-4 w-4" aria-hidden="true"></i>
+                    </button>
                 </div>
                 <x-input-error :messages="$errors->get('password')" class="mt-2" />
             </div>
 
-            <!-- Confirm Password -->
-            <div class="mb-6">
-                <x-input-label for="password_confirmation" :value="__('Confirm Password')" />
-                <div class="password-input-wrapper mt-2">
-                    <x-text-input id="password_confirmation" class="block w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-indigo-500 focus:outline-none transition pr-12"
-                                    type="password"
-                                    name="password_confirmation" required autocomplete="new-password" />
-                    <span class="password-toggle" onclick="togglePassword('password_confirmation')" title="Show/Hide Password">
-                        <i class="fas fa-eye"></i>
-                    </span>
-                </div>
+            <div>
+                <label for="password_confirmation" class="ui-label mb-1">Confirmation</label>
+                <input id="password_confirmation" class="ui-input" type="password" name="password_confirmation" required autocomplete="new-password">
                 <x-input-error :messages="$errors->get('password_confirmation')" class="mt-2" />
             </div>
 
-            <div class="flex items-center justify-end mt-6">
-                <x-primary-button class="btn-login px-6 py-3 text-white font-semibold rounded-lg">
-                    {{ __('Reset Password') }}
-                </x-primary-button>
-            </div>
+            <button type="submit" class="ui-btn-primary w-full" :disabled="submitting">
+                <i data-lucide="loader-circle" x-show="submitting" x-cloak class="h-4 w-4 animate-spin" aria-hidden="true"></i>
+                <span x-text="submitting ? 'Enregistrement...' : 'Reinitialiser'"></span>
+            </button>
         </form>
     </div>
-
-    <script>
-        function togglePassword(fieldId) {
-            const passwordInput = document.getElementById(fieldId);
-            const toggleIcon = passwordInput.nextElementSibling.querySelector('i');
-            
-            if (passwordInput.type === 'password') {
-                passwordInput.type = 'text';
-                toggleIcon.classList.remove('fa-eye');
-                toggleIcon.classList.add('fa-eye-slash');
-            } else {
-                passwordInput.type = 'password';
-                toggleIcon.classList.remove('fa-eye-slash');
-                toggleIcon.classList.add('fa-eye');
-            }
-        }
-    </script>
-</x-guest-layout>
+@endsection

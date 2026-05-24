@@ -32,15 +32,41 @@ class ImportController extends Controller
         'prestations_payees' => 'file_prestations_payees',
     ];
 
-    public function index(): View
+    public function index(Request $request): View
     {
         $query = ImportBatch::with('creator')->latest();
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('original_filename', 'like', '%' . $search . '%')
+                    ->orWhere('type', 'like', '%' . $search . '%')
+                    ->orWhere('status', 'like', '%' . $search . '%');
+            });
+        }
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        if ($request->filled('type')) {
+            $query->where('type', $request->type);
+        }
+
+        if ($request->filled('date_from')) {
+            $query->whereDate('created_at', '>=', $request->date_from);
+        }
+
+        if ($request->filled('date_to')) {
+            $query->whereDate('created_at', '<=', $request->date_to);
+        }
 
         if (Schema::hasTable('import_verifications')) {
             $query->withCount('verifications');
         }
 
-        $batches = $query->paginate(20);
+        $perPage = min((int) $request->input('per_page', 20), 100);
+        $batches = $query->paginate($perPage)->withQueryString();
 
         return view('admins.imports.index', compact('batches'));
     }

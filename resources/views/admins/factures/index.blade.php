@@ -1,443 +1,253 @@
-@extends('admins.layouts.admin')
+{{-- // VIEW: admin.factures.index --}}
+{{-- // ROLE: admin --}}
+{{-- // COMPONENTS: <x-page-header>, <x-stat-card>, <x-search-input>, <x-date-range-picker>, <x-badge>, <x-empty-state>, <x-loading-skeleton> --}}
+{{-- // FILTERS: search, client, status, verification, date range, period, amount min/max, sort, per_page, export query params --}}
+@php
+    $pageTitle = 'Factures';
+@endphp
+@extends('layouts.app')
+@section('title', $pageTitle)
 
 @section('content')
-    <div class="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8">
-        <div class="max-w-7xl mx-auto">
-            <!-- Header Section -->
-            <div class="mb-8">
-                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                    <div>
-                        <h1 class="text-3xl md:text-4xl font-bold text-gray-900">Gestion des Factures</h1>
-                        <p class="text-gray-600 mt-1">{{ $factures->total() }} facture(s) au total</p>
-                    </div>
+@php
+    $activeFilters = collect(['search', 'numero', 'client_id', 'statut', 'verification', 'date_from', 'date_to', 'period', 'amount_min', 'amount_max', 'per_page'])->filter(fn ($key) => request()->filled($key))->count();
+@endphp
 
-                </div>
-            </div>
+<div x-data="{ state: 'data', filtering: false, advanced: false }" class="space-y-6">
+    <x-page-header
+        title="Factures"
+        :subtitle="$factures->total().' facture(s) trouvee(s)'"
+        :breadcrumbs="[['label' => 'Admin'], ['label' => 'Factures']]"
+    />
 
-            <!-- Filters Section -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6 mb-6">
-                <div class="flex items-center justify-between mb-6">
-                    <h2 class="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                        <i class="fa-solid fa-filter text-blue-600"></i> Filtres et Recherche
-                    </h2>
-                    @if(request()->hasAny(['numero', 'client_id', 'statut', 'verification', 'search']))
-                        <a href="{{ route('admin.factures.index') }}"
-                            class="text-sm text-gray-500 hover:text-gray-700 font-medium">
-                            <i class="fa-solid fa-times mr-1"></i> Réinitialiser
-                        </a>
-                    @endif
-                </div>
+    <div x-show="state === 'loading'" x-cloak>
+        <x-loading-skeleton rows="5" />
+    </div>
 
-                <form method="GET" action="{{ route('admin.factures.index') }}" class="space-y-4 md:space-y-0">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
-                        <!-- Search by number -->
-                        <div class="relative">
-                            <label class="block text-xs font-semibold text-gray-700 mb-2">N° Facture</label>
-                            <input type="text" name="numero" value="{{ request('numero') }}" placeholder="Rechercher..."
-                                class="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
-                        </div>
-
-                        <!-- Client filter -->
-                        <div>
-                            <label class="block text-xs font-semibold text-gray-700 mb-2">Client</label>
-                            <select name="client_id"
-                                class="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
-                                <option value="">Tous les clients</option>
-                                @foreach($clients as $client)
-                                    <option value="{{ $client->id }}" {{ request('client_id') == $client->id ? 'selected' : '' }}>
-                                        {{ $client->name }}
-                                    </option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        <!-- Status filter -->
-                        <div>
-                            <label class="block text-xs font-semibold text-gray-700 mb-2">Statut</label>
-                            <select name="statut"
-                                class="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
-                                <option value="">Tous les statuts</option>
-                                <option value="paye" {{ request('statut') == 'paye' ? 'selected' : '' }}>Payées</option>
-                                <option value="impaye" {{ request('statut') == 'impaye' ? 'selected' : '' }}>Impayées</option>
-                                <option value="annulee" {{ request('statut') == 'annulee' ? 'selected' : '' }}>Annulées
-                                </option>
-                            </select>
-                        </div>
-
-                        <div>
-                            <label class="block text-xs font-semibold text-gray-700 mb-2">Verification</label>
-                            <select name="verification"
-                                class="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
-                                <option value="">Toutes</option>
-                                <option value="anomalies" {{ request('verification') == 'anomalies' ? 'selected' : '' }}>Avec anomalies</option>
-                                <option value="critical" {{ request('verification') == 'critical' ? 'selected' : '' }}>Erreurs</option>
-                                <option value="warning" {{ request('verification') == 'warning' ? 'selected' : '' }}>Avertissements</option>
-                                <option value="ok" {{ request('verification') == 'ok' ? 'selected' : '' }}>OK</option>
-                            </select>
-                        </div>
-
-                        <!-- Date range (optional) -->
-                        <div>
-                            <label class="block text-xs font-semibold text-gray-700 mb-2">Date de</label>
-                            <input type="date" name="date_from" value="{{ request('date_from') }}"
-                                class="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
-                        </div>
-
-                        <!-- Date to (optional) -->
-                        <div>
-                            <label class="block text-xs font-semibold text-gray-700 mb-2">Date à</label>
-                            <input type="date" name="date_to" value="{{ request('date_to') }}"
-                                class="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
-                        </div>
-                    </div>
-
-                    <!-- Sort and action buttons -->
-                    <div class="flex flex-col sm:flex-row gap-3 pt-2">
-                        <div class="flex-1">
-                            <label class="block text-xs font-semibold text-gray-700 mb-2">Trier par</label>
-                            <select name="sort_by"
-                                class="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
-                                <option value="date_desc" {{ request('sort_by') == 'date_desc' ? 'selected' : '' }}>Date (Plus
-                                    récent)</option>
-                                <option value="date_asc" {{ request('sort_by') == 'date_asc' ? 'selected' : '' }}>Date (Plus
-                                    ancien)</option>
-                                <option value="numero_asc" {{ request('sort_by') == 'numero_asc' ? 'selected' : '' }}>N°
-                                    Facture (A-Z)</option>
-                                <option value="numero_desc" {{ request('sort_by') == 'numero_desc' ? 'selected' : '' }}>N°
-                                    Facture (Z-A)</option>
-                                <option value="montant_desc" {{ request('sort_by') == 'montant_desc' ? 'selected' : '' }}>
-                                    Montant (Plus élevé)</option>
-                                <option value="montant_asc" {{ request('sort_by') == 'montant_asc' ? 'selected' : '' }}>
-                                    Montant (Plus bas)</option>
-                            </select>
-                        </div>
-                        <div class="flex gap-2 sm:pt-6">
-                            <button type="submit"
-                                class="flex-1 sm:flex-none bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2">
-                                <i class="fa-solid fa-search"></i> <span class="hidden sm:inline">Appliquer</span>
-                            </button>
-                        </div>
-                    </div>
-                </form>
-            </div>
-
-            <!-- Table Section -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                <!-- Stats Bar -->
-                <!-- <div class="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 md:p-6 border-b border-gray-200 bg-gray-50">
-                    <div class="text-center">
-                        <p class="text-gray-600 text-xs md:text-sm font-medium">Total HT</p>
-                        <p class="text-lg md:text-xl font-bold text-gray-900">
-                            {{ number_format($factures->sum('total_ht'), 2) }} DA
-                        </p>
-                    </div>
-                    <div class="text-center">
-                        <p class="text-gray-600 text-xs md:text-sm font-medium">Total TTC</p>
-                        <p class="text-lg md:text-xl font-bold text-gray-900">
-                            {{ number_format($factures->sum('total_ttc'), 2) }} DA
-                        </p>
-                    </div>
-                    <div class="text-center">
-                        <p class="text-gray-600 text-xs md:text-sm font-medium">Payées</p>
-                        <p class="text-lg md:text-xl font-bold text-green-600">
-                            {{ $factures->where('reste_a_payer', '<=', 0)->count() }}
-                        </p>
-                    </div>
-                    <div class="text-center">
-                        <p class="text-gray-600 text-xs md:text-sm font-medium">Impayées</p>
-                        <p class="text-lg md:text-xl font-bold text-red-600">
-                            {{ $factures->where('reste_a_payer', '>', 0)->count() }}
-                        </p>
-                    </div>
-                </div> -->
-                {{-- Stats Bar — utilise $stats du contrôleur, pas $factures->sum() --}}
-                <div class="grid grid-cols-2 md:grid-cols-6 gap-4 p-4 md:p-6 border-b border-gray-200 bg-gray-50">
-                    <div class="text-center">
-                        <p class="text-gray-600 text-xs font-medium">Total HT</p>
-                        <p class="text-base md:text-lg font-bold text-gray-900">
-                            {{ number_format($stats['total_ht'], 2, ',', ' ') }} DA
-                        </p>
-                    </div>
-                    <div class="text-center">
-                        <p class="text-gray-600 text-xs font-medium">Total TTC</p>
-                        <p class="text-base md:text-lg font-bold text-gray-900">
-                            {{ number_format($stats['total_ttc'], 2, ',', ' ') }} DA
-                        </p>
-                    </div>
-                    <div class="text-center">
-                        <p class="text-gray-600 text-xs font-medium">Reste à payer</p>
-                        <p class="text-base md:text-lg font-bold text-orange-600">
-                            {{ number_format($stats['reste_total'], 2, ',', ' ') }} DA
-                        </p>
-                    </div>
-                    <div class="text-center">
-                        <p class="text-gray-600 text-xs font-medium">Payées</p>
-                        <p class="text-base md:text-lg font-bold text-green-600">
-                            {{ number_format($stats['count_payees'], 0, ',', ' ') }}
-                        </p>
-                    </div>
-                    <div class="text-center">
-                        <p class="text-gray-600 text-xs font-medium">Impayées</p>
-                        <p class="text-base md:text-lg font-bold text-red-600">
-                            {{ number_format($stats['count_impayees'], 0, ',', ' ') }}
-                        </p>
-                    </div>
-                    <div class="text-center">
-                        <p class="text-gray-600 text-xs font-medium">Annulées</p>
-                        <p class="text-base md:text-lg font-bold text-gray-400">
-                            {{ number_format($stats['count_annulees'], 0, ',', ' ') }}
-                        </p>
-                    </div>
-                </div>
-                <!-- Responsive Table -->
-                <div class="overflow-x-auto">
-                    @if($factures->count())
-                        <table class="w-full text-sm">
-                            <thead class="bg-gray-50 border-b border-gray-200">
-                                <tr>
-                                    <th class="px-4 py-3 md:px-6 text-left font-semibold text-gray-900 text-xs md:text-sm">#
-                                    </th>
-                                    <th class="px-4 py-3 md:px-6 text-left font-semibold text-gray-900 text-xs md:text-sm">N°
-                                        Facture</th>
-                                    <th
-                                        class="px-4 py-3 md:px-6 text-left font-semibold text-gray-900 text-xs md:text-sm hidden sm:table-cell">
-                                        Date</th>
-                                    <th class="px-4 py-3 md:px-6 text-left font-semibold text-gray-900 text-xs md:text-sm">
-                                        Client</th>
-                                    <th class="px-4 py-3 md:px-6 text-right font-semibold text-gray-900 text-xs md:text-sm">
-                                        Montant</th>
-                                    <th
-                                        class="px-4 py-3 md:px-6 text-left font-semibold text-gray-900 text-xs md:text-sm hidden md:table-cell">
-                                        Statut</th>
-                                    <th class="px-4 py-3 md:px-6 text-center font-semibold text-gray-900 text-xs md:text-sm hidden lg:table-cell">
-                                        Verification</th>
-                                    <th class="px-4 py-3 md:px-6 text-center font-semibold text-gray-900 text-xs md:text-sm">
-                                        Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-200">
-                                @foreach($factures as $facture)
-                                    <tr class="hover:bg-gray-50 transition-colors duration-150">
-                                        <td class="px-4 py-3 md:px-6 text-gray-600 font-medium text-xs md:text-sm">
-                                            {{ ($factures->currentPage() - 1) * $factures->perPage() + $loop->iteration }}
-                                        </td>
-                                        <td class="px-4 py-3 md:px-6">
-                                            <a href="{{ route('admin.factures.show', $facture) }}"
-                                                class="font-semibold text-blue-600 hover:text-blue-800 transition text-xs md:text-sm">
-                                                {{ $facture->numero_facture }}
-                                            </a>
-                                        </td>
-                                        <td class="px-4 py-3 md:px-6 text-gray-700 text-xs md:text-sm hidden sm:table-cell">
-                                            {{ $facture->date_facture?->format('d/m/Y') ?? '—' }}
-                                        </td>
-                                        <td class="px-4 py-3 md:px-6">
-                                            <div class="text-xs md:text-sm">
-                                                <p class="font-medium text-gray-900">{{ $facture->client?->name ?? 'Client introuvable' }}</p>
-                                                <p class="text-gray-500 text-xs hidden md:block">
-                                                    {{ $facture->created_at->format('d/m/Y H:i') }}</p>
-                                            </div>
-                                        </td>
-                                        <td class="px-4 py-3 md:px-6 text-right">
-                                            <div class="text-xs md:text-sm">
-                                                <p class="font-bold text-gray-900">{{ number_format($facture->total_ttc, 2) }} DA
-                                                </p>
-                                                <p class="text-red-600 font-semibold text-xs">
-                                                    @if($facture->reste_a_payer > 0)
-                                                        Dû: {{ number_format($facture->reste_a_payer, 2) }} DA
-                                                    @else
-                                                        Payée
-                                                    @endif
-                                                </p>
-                                            </div>
-                                        </td>
-                                        <td class="px-4 py-3 md:px-6 hidden md:table-cell">
-                                            @if($facture->annuler)
-                                                <span
-                                                    class="inline-flex items-center gap-1 bg-red-50 text-red-700 px-3 py-1 rounded-full text-xs font-semibold">
-                                                    <i class="fa-solid fa-ban"></i> Annulée
-                                                </span>
-                                            @elseif($facture->reste_a_payer <= 0)
-                                                <span
-                                                    class="inline-flex items-center gap-1 bg-green-50 text-green-700 px-3 py-1 rounded-full text-xs font-semibold">
-                                                    <i class="fa-solid fa-check-circle"></i> Payée
-                                                </span>
-                                            @else
-                                                <span
-                                                    class="inline-flex items-center gap-1 bg-orange-50 text-orange-700 px-3 py-1 rounded-full text-xs font-semibold">
-                                                    <i class="fa-solid fa-clock"></i> Impayée
-                                                </span>
-                                            @endif
-                                        </td>
-                                        <td class="px-4 py-3 md:px-6 text-center hidden lg:table-cell">
-                                            @include('admins.factures.partials.verification-badge', ['facture' => $facture])
-                                        </td>
-                                        <td class="px-4 py-3 md:px-6 text-center">
-                                            <div class="flex items-center justify-center gap-2">
-                                                <!-- View -->
-                                                <a href="{{ route('admin.factures.show', $facture) }}"
-                                                    class="text-gray-500 hover:text-blue-600 hover:bg-blue-50 p-2 rounded-lg transition-all duration-200"
-                                                    title="Voir">
-                                                    <i class="fa-solid fa-eye text-sm md:text-base"></i>
-                                                </a>
-
-                                                <!-- Print -->
-                                                @if(!$facture->annuler)
-                                                    <a href="{{ route('admin.factures.print', $facture->id) }}" target="_blank"
-                                                        class="text-gray-500 hover:text-green-600 hover:bg-green-50 p-2 rounded-lg transition-all duration-200"
-                                                        title="Imprimer">
-                                                        <i class="fa-solid fa-print text-sm md:text-base"></i>
-                                                    </a>
-                                                @endif
-
-                                                <!-- Download PDF -->
-                                                <!-- @if(!$facture->annuler)
-
-                                                <a href="#"
-                                                    class="text-gray-500 hover:text-red-600 hover:bg-red-50 p-2 rounded-lg transition-all duration-200"
-                                                    title="Télécharger">
-                                                    <i class="fa-solid fa-download text-sm md:text-base"></i>
-                                                </a>
-                                                @endif -->
-
-
-                                                <!-- Dropdown Menu -->
-                                                <div class="relative group">
-                                                    <button type="button"
-                                                        class="text-gray-500 hover:text-gray-700 hover:bg-gray-100 p-2 rounded-lg transition-all duration-200">
-                                                        <i class="fa-solid fa-ellipsis-v text-sm md:text-base"></i>
-                                                    </button>
-                                                    <div
-                                                        class="hidden group-hover:block absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
-                                                        @if(!$facture->annuler)
-
-                                                            <a href="#"
-                                                                class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition">
-                                                                <i class="fa-solid fa-envelope mr-2"></i> Envoyer par email
-                                                            </a>
-                                                        @endif
-
-                                                        <a href="#"
-                                                            class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition">
-                                                            <i class="fa-solid fa-history mr-2"></i> Historique
-                                                        </a>
-                                                        @if(!$facture->annuler)
-
-                                                            <form action="#" method="POST" class="block"
-                                                                onsubmit="return confirm('Êtes-vous sûr? Cette action est irréversible.')">
-                                                                @csrf
-                                                                @method('DELETE')
-                                                                <button type="submit"
-                                                                    class="w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50 transition">
-                                                                    <i class="fa-solid fa-trash mr-2"></i> Annuler la facture
-                                                                </button>
-                                                            </form>
-                                                        @endif
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                    </tr>
-
-                                    <!-- Mobile row details (shown below main row on mobile) -->
-                                    <tr class="bg-gray-50 md:hidden">
-                                        <td colspan="7" class="px-4 py-3">
-                                            <div class="space-y-2 text-xs">
-                                                @if($facture->annuler)
-                                                    <div class="flex justify-between">
-                                                        <span class="text-gray-600">Statut:</span>
-                                                        <span
-                                                            class="inline-flex items-center gap-1 bg-red-50 text-red-700 px-2 py-1 rounded-full font-semibold">
-                                                            <i class="fa-solid fa-ban"></i> Annulée
-                                                        </span>
-                                                    </div>
-                                                @elseif($facture->reste_a_payer <= 0)
-                                                    <div class="flex justify-between">
-                                                        <span class="text-gray-600">Statut:</span>
-                                                        <span
-                                                            class="inline-flex items-center gap-1 bg-green-50 text-green-700 px-2 py-1 rounded-full font-semibold">
-                                                            <i class="fa-solid fa-check-circle"></i> Payée
-                                                        </span>
-                                                    </div>
-                                                @else
-                                                    <div class="flex justify-between">
-                                                        <span class="text-gray-600">Statut:</span>
-                                                        <span
-                                                            class="inline-flex items-center gap-1 bg-orange-50 text-orange-700 px-2 py-1 rounded-full font-semibold">
-                                                            <i class="fa-solid fa-clock"></i> Impayée
-                                                        </span>
-                                                    </div>
-                                                @endif
-                                                <div class="flex justify-between">
-                                                    <span class="text-gray-600">Créée:</span>
-                                                    <span class="font-medium">{{ $facture->created_at->format('d/m/Y H:i') }}</span>
-                                                </div>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    @else
-                        <div class="p-8 md:p-12 text-center">
-                            <i class="fa-solid fa-inbox text-5xl text-gray-300 mb-4 block"></i>
-                            <h3 class="text-lg font-semibold text-gray-600 mb-2">Aucune facture trouvée</h3>
-                            <p class="text-gray-500 mb-6">Modifiez vos filtres ou créez une nouvelle facture</p>
-                            <a href="{{ route('admin.factures.index') }}"
-                                class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2 rounded-lg transition-colors">
-                                <i class="fa-solid fa-arrow-left"></i> Voir toutes les factures
-                            </a>
-                        </div>
-                    @endif
-                </div>
-
-                <!-- Pagination -->
-                @if($factures->count())
-                    <div class="px-4 py-6 md:px-6 border-t border-gray-200 bg-gray-50">
-                        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                            <div class="text-sm text-gray-600">
-                                Affichage de <span
-                                    class="font-semibold text-gray-900">{{ ($factures->currentPage() - 1) * $factures->perPage() + 1 }}</span>
-                                à <span
-                                    class="font-semibold text-gray-900">{{ min($factures->currentPage() * $factures->perPage(), $factures->total()) }}</span>
-                                sur <span class="font-semibold text-gray-900">{{ $factures->total() }}</span> résultats
-                            </div>
-                            <div class="flex justify-center md:justify-end">
-                                {{ $factures->links() }}
-                            </div>
-                        </div>
-                    </div>
-                @endif
-            </div>
+    <div x-show="state === 'error'" x-cloak class="rounded-lg border border-danger-200 bg-danger-50 p-4 text-danger-800 dark:border-danger-800 dark:bg-danger-900/20 dark:text-danger-200">
+        <div class="flex items-center justify-between gap-4">
+            <p class="text-sm font-medium">Impossible de charger les factures.</p>
+            <button class="ui-btn-secondary" @click="state = 'data'">Reessayer</button>
         </div>
     </div>
 
-    <!-- Custom styles for better mobile responsiveness -->
-    <style>
-        /* Pagination buttons styling */
-        .pagination {
-            display: flex;
-            gap: 0.5rem;
-            flex-wrap: wrap;
-            justify-content: center;
-        }
+    <div class="space-y-6 transition-all duration-300">
+        <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <x-stat-card title="Total TTC" :value="number_format($stats['total_ttc'] ?? 0, 0, ',', ' ').' DA'" icon="receipt-text" color="info" />
+            <x-stat-card title="Reste a payer" :value="number_format($stats['reste_total'] ?? 0, 0, ',', ' ').' DA'" icon="badge-alert" color="danger" />
+            <x-stat-card title="Factures payees" :value="number_format($stats['count_payees'] ?? 0, 0, ',', ' ')" icon="check-circle-2" color="success" />
+            <x-stat-card title="Anomalies" :value="number_format($stats['count_anomalies'] ?? 0, 0, ',', ' ')" icon="triangle-alert" color="warning" />
+        </section>
 
-        .pagination a,
-        .pagination span {
-            @apply px-3 py-1 text-sm border border-gray-300 rounded-lg transition-colors;
-        }
+        <form method="GET" action="{{ route('admin.factures.index') }}" class="ui-card p-4" @submit="filtering = true">
+            <div class="grid grid-cols-1 gap-3 xl:grid-cols-12">
+                <div class="xl:col-span-3">
+                    <x-search-input name="search" placeholder="N facture, client, code..." :value="request('search', request('numero'))" />
+                </div>
+                <div class="xl:col-span-3">
+                    <select name="client_id" class="ui-input" aria-label="Client">
+                        <option value="">Tous les clients</option>
+                        @foreach($clients as $client)
+                            <option value="{{ $client->id }}" @selected(request('client_id') == $client->id)>{{ $client->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="xl:col-span-2">
+                    <select name="statut" class="ui-input" aria-label="Statut">
+                        <option value="">Tous statuts</option>
+                        <option value="paye" @selected(request('statut') === 'paye')>Payees</option>
+                        <option value="impaye" @selected(request('statut') === 'impaye')>Impayees</option>
+                        <option value="annulee" @selected(request('statut') === 'annulee')>Annulees</option>
+                    </select>
+                </div>
+                <div class="xl:col-span-2">
+                    <select name="period" class="ui-input" aria-label="Periode">
+                        <option value="">Toute periode</option>
+                        <option value="today" @selected(request('period') === 'today')>Aujourd'hui</option>
+                        <option value="week" @selected(request('period') === 'week')>Cette semaine</option>
+                        <option value="month" @selected(request('period') === 'month')>Ce mois</option>
+                        <option value="custom" @selected(request('period') === 'custom')>Personnalise</option>
+                    </select>
+                </div>
+                <div class="flex gap-2 xl:col-span-2">
+                    <button type="submit" class="ui-btn-primary flex-1">
+                        <i data-lucide="search" class="h-4 w-4" aria-hidden="true"></i>
+                        Filtrer
+                    </button>
+                    <button type="button" class="ui-btn-secondary relative" @click="advanced = ! advanced">
+                        <i data-lucide="sliders-horizontal" class="h-4 w-4" aria-hidden="true"></i>
+                        @if($activeFilters)
+                            <span class="absolute -right-1 -top-1 rounded-full bg-primary-600 px-1.5 py-0.5 text-[10px] text-white">{{ $activeFilters }}</span>
+                        @endif
+                    </button>
+                </div>
+            </div>
 
-        .pagination a:hover {
-            @apply bg-blue-50 border-blue-300 text-blue-600;
-        }
+            <div x-show="advanced" x-cloak class="mt-4 border-t border-gray-200 pt-4 dark:border-gray-700">
+                <div class="grid grid-cols-1 gap-4 lg:grid-cols-4">
+                    <x-date-range-picker />
+                    <div>
+                        <label class="ui-label mb-1" for="verification">Verification</label>
+                        <select id="verification" name="verification" class="ui-input">
+                            <option value="">Toutes</option>
+                            <option value="anomalies" @selected(request('verification') === 'anomalies')>Avec anomalies</option>
+                            <option value="critical" @selected(request('verification') === 'critical')>Critique</option>
+                            <option value="warning" @selected(request('verification') === 'warning')>Avertissement</option>
+                            <option value="ok" @selected(request('verification') === 'ok')>OK</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="ui-label mb-1" for="sort_by">Tri</label>
+                        <select id="sort_by" name="sort_by" class="ui-input">
+                            <option value="date_desc" @selected(request('sort_by', 'date_desc') === 'date_desc')>Date recente</option>
+                            <option value="date_asc" @selected(request('sort_by') === 'date_asc')>Date ancienne</option>
+                            <option value="montant_desc" @selected(request('sort_by') === 'montant_desc')>Montant haut</option>
+                            <option value="montant_asc" @selected(request('sort_by') === 'montant_asc')>Montant bas</option>
+                            <option value="numero_asc" @selected(request('sort_by') === 'numero_asc')>Numero A-Z</option>
+                            <option value="numero_desc" @selected(request('sort_by') === 'numero_desc')>Numero Z-A</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="ui-label mb-1" for="per_page">Entrees</label>
+                        <select id="per_page" name="per_page" class="ui-input">
+                            @foreach([10, 25, 50, 100] as $size)
+                                <option value="{{ $size }}" @selected((int) request('per_page', 25) === $size)>{{ $size }} / page</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="ui-label mb-1" for="amount_min">Montant min</label>
+                        <input id="amount_min" name="amount_min" type="number" min="0" step="0.01" value="{{ request('amount_min') }}" class="ui-input">
+                    </div>
+                    <div>
+                        <label class="ui-label mb-1" for="amount_max">Montant max</label>
+                        <input id="amount_max" name="amount_max" type="number" min="0" step="0.01" value="{{ request('amount_max') }}" class="ui-input">
+                    </div>
+                </div>
+                <div class="mt-4 flex flex-wrap gap-2">
+                    @if($activeFilters)
+                        <a href="{{ route('admin.factures.index') }}" class="ui-btn-secondary">
+                            <i data-lucide="rotate-ccw" class="h-4 w-4" aria-hidden="true"></i>
+                            Reinitialiser
+                        </a>
+                    @endif
+                    <a href="{{ route('admin.factures.index', array_merge(request()->query(), ['export' => 'csv'])) }}" class="ui-btn-secondary">
+                        <i data-lucide="file-down" class="h-4 w-4" aria-hidden="true"></i>
+                        CSV
+                    </a>
+                    <a href="{{ route('admin.factures.index', array_merge(request()->query(), ['export' => 'pdf'])) }}" class="ui-btn-secondary">
+                        <i data-lucide="file-text" class="h-4 w-4" aria-hidden="true"></i>
+                        PDF
+                    </a>
+                </div>
+            </div>
+        </form>
 
-        .pagination .active span {
-            @apply bg-blue-600 text-white border-blue-600;
-        }
+        <div class="ui-card relative overflow-hidden">
+            <div x-show="filtering" x-cloak class="absolute inset-0 z-20 flex items-center justify-center bg-white/70 backdrop-blur-sm dark:bg-gray-900/70">
+                <span class="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold shadow dark:bg-gray-800">
+                    <i data-lucide="loader-circle" class="h-4 w-4 animate-spin" aria-hidden="true"></i>
+                    Chargement...
+                </span>
+            </div>
 
-        /* Smooth transitions */
-        * {
-            transition-property: background-color, border-color, color;
-            transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-        }
-    </style>
+            @if($factures->isEmpty())
+                <div class="p-4">
+                    <x-empty-state icon="file-text" title="Aucune facture" message="Aucune facture ne correspond aux filtres selectionnes." />
+                </div>
+            @else
+                <div class="hidden md:block">
+                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                        <thead class="bg-gray-50 dark:bg-gray-900/60">
+                            <tr>
+                                <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">N facture</th>
+                                <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">Client</th>
+                                <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">Navire / escale</th>
+                                <th scope="col" class="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">Montant</th>
+                                <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">Statut</th>
+                                <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">Date</th>
+                                <th scope="col" class="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                            @foreach($factures as $facture)
+                                @php
+                                    $status = $facture->annuler ? 'annulee' : ((float) $facture->reste_a_payer <= 0 ? 'paye' : 'impaye');
+                                @endphp
+                                <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                                    <td class="px-4 py-4">
+                                        <a href="{{ route('admin.factures.show', $facture) }}" class="font-semibold text-primary-600 hover:text-primary-700 dark:text-primary-300">#{{ $facture->numero_facture }}</a>
+                                        @if($facture->verification_status)
+                                            <div class="mt-1"><x-badge :status="$facture->verification_status" /></div>
+                                        @endif
+                                    </td>
+                                    <td class="px-4 py-4">
+                                        <div class="flex items-center gap-3">
+                                            <x-avatar :name="$facture->client?->name ?? 'Client'" size="sm" />
+                                            <div class="min-w-0">
+                                                <p class="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">{{ $facture->client?->name ?? '-' }}</p>
+                                                <p class="text-xs text-gray-500 dark:text-gray-400">{{ $facture->client?->code_client ?? '-' }}</p>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-4 py-4 text-sm text-gray-700 dark:text-gray-300">
+                                        {{ $facture->escale?->navire?->nom ?? $facture->escale?->numero_escale ?? '-' }}
+                                    </td>
+                                    <td class="px-4 py-4 text-right">
+                                        <p class="font-semibold tabular-nums">{{ number_format($facture->total_ttc, 2, ',', ' ') }} DA</p>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">Reste {{ number_format($facture->reste_a_payer, 2, ',', ' ') }} DA</p>
+                                    </td>
+                                    <td class="px-4 py-4"><x-badge :status="$status" /></td>
+                                    <td class="px-4 py-4 text-sm text-gray-700 dark:text-gray-300">{{ optional($facture->date_facture)->format('d/m/Y') }}</td>
+                                    <td class="px-4 py-4">
+                                        <div class="flex justify-end gap-2">
+                                            <a href="{{ route('admin.factures.show', $facture) }}" class="ui-icon-btn" aria-label="Voir facture"><i data-lucide="eye" class="h-4 w-4"></i></a>
+                                            @if(! $facture->annuler)
+                                                <a href="{{ route('admin.factures.print', $facture) }}" target="_blank" class="ui-icon-btn" aria-label="Imprimer facture"><i data-lucide="printer" class="h-4 w-4"></i></a>
+                                            @endif
+                                        </div>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="space-y-3 p-4 md:hidden">
+                    @foreach($factures as $facture)
+                        @php
+                            $status = $facture->annuler ? 'annulee' : ((float) $facture->reste_a_payer <= 0 ? 'paye' : 'impaye');
+                        @endphp
+                        <article class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
+                            <div class="flex items-start justify-between gap-3">
+                                <div>
+                                    <a href="{{ route('admin.factures.show', $facture) }}" class="font-semibold text-primary-600 dark:text-primary-300">#{{ $facture->numero_facture }}</a>
+                                    <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">{{ $facture->client?->name ?? '-' }}</p>
+                                </div>
+                                <x-badge :status="$status" />
+                            </div>
+                            <div class="mt-4 grid grid-cols-2 gap-3 text-sm">
+                                <div><span class="text-gray-500 dark:text-gray-400">Montant</span><p class="font-semibold">{{ number_format($facture->total_ttc, 0, ',', ' ') }} DA</p></div>
+                                <div><span class="text-gray-500 dark:text-gray-400">Date</span><p class="font-semibold">{{ optional($facture->date_facture)->format('d/m/Y') }}</p></div>
+                            </div>
+                            <div class="mt-4 flex gap-2">
+                                <a href="{{ route('admin.factures.show', $facture) }}" class="ui-btn-secondary flex-1">Voir</a>
+                                @if(! $facture->annuler)
+                                    <a href="{{ route('admin.factures.print', $facture) }}" target="_blank" class="ui-btn-secondary flex-1">Imprimer</a>
+                                @endif
+                            </div>
+                        </article>
+                    @endforeach
+                </div>
+
+                <div class="border-t border-gray-200 px-4 py-3 dark:border-gray-700">
+                    <div class="mb-3 text-sm text-gray-600 dark:text-gray-400">
+                        Affichage {{ $factures->firstItem() }}-{{ $factures->lastItem() }} sur {{ $factures->total() }} factures
+                    </div>
+                    {{ $factures->appends(request()->query())->links() }}
+                </div>
+            @endif
+        </div>
+    </div>
+</div>
 @endsection

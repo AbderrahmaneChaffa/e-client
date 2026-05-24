@@ -37,12 +37,17 @@ class DashboardController extends Controller
             : 0;
 
         // ── Compteurs statuts ─────────────────────────────────────────────
-        $paidCount = Facture::where('client_id', $clientId)
-            ->paid()->count();
-        $unpaidCount = Facture::where('client_id', $clientId)
-            ->unpaid()->count();
-        $canceledCount = Facture::where('client_id', $clientId)
-            ->canceled()->count();
+        $statusStats = Facture::where('client_id', $clientId)
+            ->selectRaw('
+                SUM(CASE WHEN annuler = 0 AND reste_a_payer <= 0 THEN 1 ELSE 0 END) AS paid_count,
+                SUM(CASE WHEN annuler = 0 AND reste_a_payer > 0 THEN 1 ELSE 0 END) AS unpaid_count,
+                SUM(CASE WHEN annuler = 1 THEN 1 ELSE 0 END) AS canceled_count
+            ')
+            ->first();
+
+        $paidCount = (int) ($statusStats->paid_count ?? 0);
+        $unpaidCount = (int) ($statusStats->unpaid_count ?? 0);
+        $canceledCount = (int) ($statusStats->canceled_count ?? 0);
 
         // ── Graphique mensuel — 12 mois ────────────────────────────────────
         $monthlyRaw = Paiement::selectRaw('

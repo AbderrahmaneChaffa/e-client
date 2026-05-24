@@ -1,965 +1,363 @@
-{{-- resources/views/admins/imports/index.blade.php --}}
-@extends('admins.layouts.admin')
+{{-- // VIEW: admin.imports.index --}}
+{{-- // ROLE: admin --}}
+{{-- // COMPONENTS: <x-page-header>, <x-stat-card>, <x-search-input>, <x-date-range-picker>, <x-badge>, <x-empty-state>, <x-loading-skeleton> --}}
+{{-- // FILTERS: search, status, type, date range, per_page, export query params --}}
+@php
+    $pageTitle = 'Imports ERP BIG';
+    $activeFilters = collect(['search', 'status', 'type', 'date_from', 'date_to', 'per_page'])->filter(fn ($key) => request()->filled($key))->count();
+    $statusCounts = $batches->getCollection()->groupBy('status')->map->count();
+@endphp
+@extends('layouts.app')
+@section('title', $pageTitle)
 
 @section('content')
-    <div class="max-w-5xl mx-auto py-8 px-4" x-data="importUploader()" x-init="init()">
+<div x-data="importUploader()" x-init="init()" class="space-y-6">
+    <x-page-header
+        title="Imports ERP BIG"
+        subtitle="Deposez jusqu'a 5 fichiers Excel; la sequence Factures, Prestations, Paiements est orchestree en arriere-plan."
+        :breadcrumbs="[['label' => 'Admin'], ['label' => 'Imports']]"
+    />
 
-        {{-- ── En-tête ──────────────────────────────────────────────────────────── --}}
-        <div class="mb-8">
-            <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Import ERP BIG</h1>
-            <p class="text-gray-500 dark:text-gray-400 mt-1 text-sm">
-                Importez vos exports Excel dans l'ordre correct. La chaîne s'exécute automatiquement en arrière-plan.
-            </p>
-        </div>
+    <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <x-stat-card title="Imports visibles" :value="number_format($batches->count(), 0, ',', ' ')" icon="upload-cloud" color="primary" />
+        <x-stat-card title="Termines" :value="number_format($statusCounts->get('completed', 0), 0, ',', ' ')" icon="check-circle-2" color="success" />
+        <x-stat-card title="En cours" :value="number_format($statusCounts->get('processing', 0) + $statusCounts->get('pending', 0), 0, ',', ' ')" icon="loader-circle" color="info" />
+        <x-stat-card title="Echecs" :value="number_format($statusCounts->get('failed', 0), 0, ',', ' ')" icon="circle-alert" color="danger" />
+    </section>
 
-        {{-- ── Bannière ordre d'exécution ─────────────────────────────────────────── --}}
-        <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800
-                                            rounded-xl p-4 mb-6 flex items-start gap-3">
-            <svg class="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <div class="text-sm text-blue-800 dark:text-blue-200">
-                <strong>Ordre d'exécution garanti :</strong>
-                Factures
-                <span class="mx-1 text-blue-400">→</span> Prestations
-                <span class="mx-1 text-blue-400">→</span> Paiements
-                <span class="mx-1 text-blue-400">→</span> Factures Payées
-                <span class="mx-1 text-blue-400">→</span> Prestations Payées.
-                Chaque fichier est optionnel — seuls les fichiers déposés seront traités.
-            </div>
-        </div>
+    <section class="ui-card p-5">
+        <div class="grid grid-cols-1 gap-6 xl:grid-cols-3">
+            <div class="xl:col-span-2">
+                <div class="mb-4">
+                    <h2 class="text-base font-semibold text-gray-900 dark:text-gray-100">Nouvel import</h2>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">Selectionnez vos fichiers Excel dans n'importe quel ordre.</p>
+                </div>
 
-        {{-- ── Zones de dépôt ──────────────────────────────────────────────────────── --}}
-        <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 mb-6">
-
-            <div class="mb-5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 p-4">
-                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <div>
-                        <p class="text-sm font-semibold text-gray-800 dark:text-gray-100">Upload automatique</p>
-                        <p class="text-xs text-gray-500 dark:text-gray-400">Selectionnez 1 a 5 fichiers, dans n'importe quel ordre.</p>
+                <div
+                    class="rounded-lg border-2 border-dashed border-primary-200 bg-primary-50/60 p-6 text-center transition hover:border-primary-400 dark:border-primary-900/60 dark:bg-primary-900/10"
+                    @dragover.prevent
+                    @drop.prevent="setDroppedFiles($event)"
+                >
+                    <input x-ref="filesInput" type="file" class="hidden" accept=".xlsx,.xls" multiple @change="setFiles($event)">
+                    <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-white text-primary-600 shadow-sm dark:bg-gray-800 dark:text-primary-300">
+                        <i data-lucide="file-spreadsheet" class="h-7 w-7" aria-hidden="true"></i>
                     </div>
-                    <div class="flex flex-wrap items-center gap-2">
-                        <input x-ref="adaptiveFiles" type="file" accept=".xlsx,.xls" multiple class="hidden"
-                            @change="setAdaptiveFiles($event)" />
-                        <button type="button" @click="$refs.adaptiveFiles.click()"
-                            class="px-3 py-2 rounded-lg text-xs font-semibold bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
-                            Choisir fichiers
-                        </button>
-                        <button type="button" @click="preview()" :disabled="!hasAnyFile || isProcessing"
-                            class="px-3 py-2 rounded-lg text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-700 disabled:bg-gray-300 dark:disabled:bg-gray-600">
-                            Previsualiser
-                        </button>
+                    <p class="font-semibold text-gray-900 dark:text-gray-100">Glissez-deposez vos fichiers ici</p>
+                    <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Formats acceptes: .xlsx, .xls · maximum 5 fichiers</p>
+                    <button type="button" class="ui-btn-primary mt-5" @click="$refs.filesInput.click()">
+                        <i data-lucide="folder-open" class="h-4 w-4" aria-hidden="true"></i>
+                        Choisir fichiers
+                    </button>
+                </div>
+
+                <template x-if="files.length">
+                    <div class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+                        <template x-for="file in files" :key="file.name + file.size">
+                            <div class="rounded-lg border border-gray-200 p-3 dark:border-gray-700">
+                                <div class="flex items-center gap-3">
+                                    <i data-lucide="file-spreadsheet" class="h-5 w-5 text-success-600" aria-hidden="true"></i>
+                                    <div class="min-w-0">
+                                        <p class="truncate text-sm font-semibold" x-text="file.name"></p>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400" x-text="formatBytes(file.size)"></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </template>
+            </div>
+
+            <aside class="space-y-4">
+                <div class="rounded-lg border border-info-200 bg-info-50 p-4 text-info-800 dark:border-info-900/60 dark:bg-info-900/20 dark:text-info-200">
+                    <div class="flex items-start gap-3">
+                        <i data-lucide="info" class="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true"></i>
+                        <p class="text-sm">Ordre garanti: Factures, Prestations, Paiements, Factures Payees, Prestations Payees.</p>
                     </div>
                 </div>
-                <div x-show="adaptiveFiles.length" x-cloak class="mt-3 flex flex-wrap gap-2">
-                    <template x-for="file in adaptiveFiles" :key="file.name + file.size">
-                        <span class="px-2 py-1 rounded bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs text-gray-600 dark:text-gray-300"
-                            x-text="file.name"></span>
-                    </template>
-                </div>
-            </div>
 
-            {{-- Ligne 1 : 3 zones --}}
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-
-                {{-- Factures --}}
-                {{-- <x-import-drop-zone ref="fileFactures" model="factures" label="Factures" color="amber"
-                    icon="document" />
-
-                @php
-                $zones = [
-                [
-                'ref' => 'fileFactures',
-                'model' => 'factures',
-                'label' => 'Factures',
-                'color' => 'amber',
-                'icon' => 'document',
-                ],
-                [
-                'ref' => 'filePrestations',
-                'model' => 'prestations',
-                'label' => 'Prestations',
-                'color' => 'teal',
-                'icon' => 'list',
-                ],
-                [
-                'ref' => 'filePaiements',
-                'model' => 'paiements',
-                'label' => 'Paiements',
-                'color' => 'blue',
-                'icon' => 'payment',
-                ],
-                ];
-                @endphp --}}
-
-                {{-- Factures --}}
-                <div class="relative flex flex-col items-center justify-center gap-2 p-5
-                                                    border-2 border-dashed rounded-xl cursor-pointer select-none
-                                                    border-amber-300 dark:border-amber-700 transition-colors duration-200
-                                                    hover:bg-amber-50 dark:hover:bg-amber-900/20"
-                    @click="$refs.fileFactures.click()"
-                    :class="files.factures ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-400' : ''">
-                    <svg class="w-9 h-9 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414A1 1 0 0121 9.414V19a2 2 0 01-2 2z" />
-                    </svg>
-                    <span class="text-xs font-semibold text-amber-700 dark:text-amber-300">Factures</span>
-                    <span class="text-xs text-gray-400 dark:text-gray-500 text-center leading-tight"
-                        x-text="files.factures ? files.factures.name : 'Cliquer ou glisser un fichier .xlsx'"></span>
-                    <span x-show="files.factures" x-cloak class="absolute top-2 right-2 w-5 h-5 bg-green-500 rounded-full
-                                                         flex items-center justify-center shadow-sm">
-                        <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
-                        </svg>
-                    </span>
-                    <input x-ref="fileFactures" type="file" accept=".xlsx,.xls" class="hidden"
-                        @change="files.factures = $event.target.files[0]" />
-                </div>
-
-                {{-- Prestations --}}
-                <div class="relative flex flex-col items-center justify-center gap-2 p-5
-                                                    border-2 border-dashed rounded-xl cursor-pointer select-none
-                                                    border-teal-300 dark:border-teal-700 transition-colors duration-200
-                                                    hover:bg-teal-50 dark:hover:bg-teal-900/20"
-                    @click="$refs.filePrestations.click()"
-                    :class="files.prestations ? 'bg-teal-50 dark:bg-teal-900/20 border-teal-400' : ''">
-                    <svg class="w-9 h-9 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                            d="M4 6h16M4 10h16M4 14h10M4 18h6" />
-                    </svg>
-                    <span class="text-xs font-semibold text-teal-700 dark:text-teal-300">Prestations</span>
-                    <span class="text-xs text-gray-400 dark:text-gray-500 text-center leading-tight"
-                        x-text="files.prestations ? files.prestations.name : 'Cliquer ou glisser un fichier .xlsx'"></span>
-                    <span x-show="files.prestations" x-cloak class="absolute top-2 right-2 w-5 h-5 bg-green-500 rounded-full
-                                                         flex items-center justify-center shadow-sm">
-                        <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
-                        </svg>
-                    </span>
-                    <input x-ref="filePrestations" type="file" accept=".xlsx,.xls" class="hidden"
-                        @change="files.prestations = $event.target.files[0]" />
-                </div>
-
-                {{-- Paiements --}}
-                <div class="relative flex flex-col items-center justify-center gap-2 p-5
-                                                    border-2 border-dashed rounded-xl cursor-pointer select-none
-                                                    border-blue-300 dark:border-blue-700 transition-colors duration-200
-                                                    hover:bg-blue-50 dark:hover:bg-blue-900/20"
-                    @click="$refs.filePaiements.click()"
-                    :class="files.paiements ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-400' : ''">
-                    <svg class="w-9 h-9 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                            d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2z" />
-                    </svg>
-                    <span class="text-xs font-semibold text-blue-700 dark:text-blue-300">Paiements</span>
-                    <span class="text-xs text-gray-400 dark:text-gray-500 text-center leading-tight"
-                        x-text="files.paiements ? files.paiements.name : 'Cliquer ou glisser un fichier .xlsx'"></span>
-                    <span x-show="files.paiements" x-cloak class="absolute top-2 right-2 w-5 h-5 bg-green-500 rounded-full
-                                                         flex items-center justify-center shadow-sm">
-                        <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
-                        </svg>
-                    </span>
-                    <input x-ref="filePaiements" type="file" accept=".xlsx,.xls" class="hidden"
-                        @change="files.paiements = $event.target.files[0]" />
-                </div>
-            </div>
-
-            {{-- Séparateur avec label --}}
-            <div class="flex items-center gap-3 my-4">
-                <div class="flex-1 h-px bg-gray-200 dark:bg-gray-700"></div>
-                <span class="text-xs text-gray-400 dark:text-gray-500 font-medium uppercase tracking-wide px-2">
-                    Historique des paiements
-                </span>
-                <div class="flex-1 h-px bg-gray-200 dark:bg-gray-700"></div>
-            </div>
-
-            {{-- Ligne 2 : 2 zones centrées --}}
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl mx-auto mb-6">
-
-                {{-- Factures Payées --}}
-                <div class="relative flex flex-col items-center justify-center gap-2 p-5
-                                                    border-2 border-dashed rounded-xl cursor-pointer select-none
-                                                    border-green-300 dark:border-green-700 transition-colors duration-200
-                                                    hover:bg-green-50 dark:hover:bg-green-900/20"
-                    @click="$refs.fileFacturesPayees.click()"
-                    :class="files.factures_payees ? 'bg-green-50 dark:bg-green-900/20 border-green-400' : ''">
-                    <svg class="w-9 h-9 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span class="text-xs font-semibold text-green-700 dark:text-green-300">Factures Payées</span>
-                    <span class="text-xs text-gray-400 dark:text-gray-500 text-center leading-tight"
-                        x-text="files.factures_payees ? files.factures_payees.name : 'Cliquer ou glisser un fichier .xlsx'"></span>
-                    <span x-show="files.factures_payees" x-cloak class="absolute top-2 right-2 w-5 h-5 bg-green-500 rounded-full
-                                                         flex items-center justify-center shadow-sm">
-                        <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
-                        </svg>
-                    </span>
-                    <input x-ref="fileFacturesPayees" type="file" accept=".xlsx,.xls" class="hidden"
-                        @change="files.factures_payees = $event.target.files[0]" />
-                </div>
-
-                {{-- Prestations Payées --}}
-                <div class="relative flex flex-col items-center justify-center gap-2 p-5
-                                                    border-2 border-dashed rounded-xl cursor-pointer select-none
-                                                    border-purple-300 dark:border-purple-700 transition-colors duration-200
-                                                    hover:bg-purple-50 dark:hover:bg-purple-900/20"
-                    @click="$refs.filePrestationsPayees.click()"
-                    :class="files.prestations_payees ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-400' : ''">
-                    <svg class="w-9 h-9 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2
-                                                         M9 5a2 2 0 002 2h2a2 2 0 002-2
-                                                         M9 5a2 2 0 012-2h2a2 2 0 012 2
-                                                         m-6 9l2 2 4-4" />
-                    </svg>
-                    <span class="text-xs font-semibold text-purple-700 dark:text-purple-300">Prestations Payées</span>
-                    <span class="text-xs text-gray-400 dark:text-gray-500 text-center leading-tight"
-                        x-text="files.prestations_payees ? files.prestations_payees.name : 'Cliquer ou glisser un fichier .xlsx'"></span>
-                    <span x-show="files.prestations_payees" x-cloak class="absolute top-2 right-2 w-5 h-5 bg-green-500 rounded-full
-                                                         flex items-center justify-center shadow-sm">
-                        <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
-                        </svg>
-                    </span>
-                    <input x-ref="filePrestationsPayees" type="file" accept=".xlsx,.xls" class="hidden"
-                        @change="files.prestations_payees = $event.target.files[0]" />
-                </div>
-            </div>
-
-            {{-- Bouton lancer --}}
-            <div class="flex flex-wrap items-center gap-4">
-                <label class="inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
-                    <input type="checkbox" x-model="forceImport"
-                        class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                    Import force
+                <label class="flex items-center gap-2 rounded-lg border border-gray-200 p-3 text-sm dark:border-gray-700">
+                    <input type="checkbox" x-model="forceImport" class="rounded border-gray-300 text-primary-600 focus:ring-primary-600 dark:border-gray-700 dark:bg-gray-900">
+                    Forcer l'import meme si un doublon est detecte
                 </label>
-                <button @click="submit()" :disabled="!hasAnyFile || isProcessing" class="inline-flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-semibold
-                                                       text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800
-                                                       disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed
-                                                       transition-colors shadow-sm">
-                    <svg x-show="!isProcessing" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                    </svg>
-                    <svg x-show="isProcessing" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                    </svg>
-                    <span
-                        x-text="isProcessing
-                                                ? 'Traitement en cours…'
-                                                : 'Lancer l\'import (' + fileCount + ' fichier' + (fileCount > 1 ? 's' : '') + ')'">
-                    </span>
-                </button>
 
-                {{-- Compteur fichiers sélectionnés --}}
-                <span x-show="hasAnyFile && !isProcessing" class="text-sm text-gray-500 dark:text-gray-400">
-                    <span x-text="fileCount"></span> fichier(s) prêt(s)
-                </span>
-            </div>
+                <div class="grid grid-cols-1 gap-3">
+                    <button type="button" class="ui-btn-secondary w-full" :disabled="!files.length || processing" @click="preview()">
+                        <i data-lucide="scan-search" class="h-4 w-4" aria-hidden="true"></i>
+                        Previsualiser
+                    </button>
+                    <button type="button" class="ui-btn-primary w-full" :disabled="!files.length || processing" @click="startImport()">
+                        <i data-lucide="loader-circle" x-show="processing" x-cloak class="h-4 w-4 animate-spin" aria-hidden="true"></i>
+                        <span x-text="processing ? 'Traitement...' : 'Lancer import'"></span>
+                    </button>
+                </div>
+            </aside>
         </div>
 
-        {{-- ── Barres de progression ────────────────────────────────────────────────── --}}
-        <div x-show="previewReport" x-cloak class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 mb-6">
-            <div class="flex items-center justify-between gap-3 mb-4">
-                <div>
-                    <h2 class="text-base font-bold text-gray-900 dark:text-white">Apercu pre-import</h2>
-                    <p class="text-xs text-gray-500 dark:text-gray-400">
-                        <span x-text="previewReport?.summary?.rows ?? 0"></span> lignes detectees,
-                        <span x-text="previewReport?.summary?.scanned_rows ?? 0"></span> analysees,
-                        <span x-text="previewReport?.summary?.created ?? 0"></span> nouvelles,
-                        <span x-text="previewReport?.summary?.updated ?? 0"></span> mises a jour,
-                        <span x-text="previewReport?.summary?.skipped ?? 0"></span> ignorees.
-                        <span x-show="previewReport?.summary?.impact_is_estimate" class="text-amber-600">
-                            Estimation rapide.
-                        </span>
-                    </p>
-                </div>
-                <span class="px-2 py-1 rounded-full text-xs font-semibold"
-                    :class="previewReport?.valid ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'"
-                    x-text="previewReport?.valid ? 'Format valide' : 'A corriger'"></span>
-            </div>
+        <div x-show="message" x-cloak class="mt-5 rounded-lg border p-4 text-sm" :class="messageType === 'error' ? 'border-danger-200 bg-danger-50 text-danger-800 dark:border-danger-800 dark:bg-danger-900/20 dark:text-danger-200' : 'border-success-200 bg-success-50 text-success-800 dark:border-success-800 dark:bg-success-900/20 dark:text-success-200'">
+            <p x-text="message"></p>
+        </div>
 
-            <div class="grid gap-3">
-                <template x-for="file in previewReport?.files ?? []" :key="file.filename">
-                    <div class="rounded-lg border border-gray-100 dark:border-gray-700 p-3">
-                        <div class="flex flex-wrap items-center justify-between gap-2">
-                            <div>
-                                <p class="text-sm font-semibold text-gray-800 dark:text-gray-100" x-text="file.filename"></p>
-                                <p class="text-xs text-gray-500 dark:text-gray-400">
-                                    Type: <span x-text="file.type"></span> -
-                                    Lignes: <span x-text="file.row_count"></span> -
-                                    Analysees: <span x-text="file.scanned_rows"></span> -
-                                    TTC: <span x-text="formatAmount(file.totals?.total_ttc ?? 0)"></span> DA
-                                </p>
+        <div x-show="previewRows.length" x-cloak class="mt-5 rounded-lg border border-gray-200 dark:border-gray-700">
+            <div class="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
+                <h3 class="font-semibold">Previsualisation</h3>
+            </div>
+            <div class="grid grid-cols-1 gap-3 p-4 md:grid-cols-2">
+                <template x-for="row in previewRows" :key="row.filename || row.type">
+                    <div class="rounded-lg bg-gray-50 p-4 dark:bg-gray-900/60">
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="min-w-0">
+                                <p class="truncate font-semibold" x-text="row.filename || row.original_filename || 'Fichier'"></p>
+                                <p class="text-sm text-gray-500 dark:text-gray-400" x-text="row.type || row.detected_type || 'Type detecte'"></p>
                             </div>
-                            <div class="text-xs text-gray-500 dark:text-gray-400">
-                                <span x-text="file.impact.created"></span> C /
-                                <span x-text="file.impact.updated"></span> M /
-                                <span x-text="file.impact.skipped"></span> I
-                            </div>
-                        </div>
-                        <div x-show="file.missing_headers?.length" class="mt-2 text-xs text-red-600">
-                            Colonnes manquantes: <span x-text="file.missing_headers.join(', ')"></span>
+                            <span class="rounded-full bg-primary-100 px-2 py-1 text-xs font-semibold text-primary-700 dark:bg-primary-900/40 dark:text-primary-200" x-text="row.rows || row.total_rows || 'OK'"></span>
                         </div>
                     </div>
                 </template>
             </div>
         </div>
 
-        @php
-            $typeConfig = [
-                'factures' => ['label' => 'Factures', 'color' => 'amber'],
-                'prestations' => ['label' => 'Prestations', 'color' => 'teal'],
-                'paiements' => ['label' => 'Paiements', 'color' => 'blue'],
-                'factures_payees' => ['label' => 'Factures Payées', 'color' => 'green'],
-                'prestations_payees' => ['label' => 'Prestations Payées', 'color' => 'purple'],
-            ];
-        @endphp
-
-        <template x-for="(prog, type) in progresses" :key="type">
-            <div x-show="prog.visible" x-transition:enter="transition ease-out duration-300"
-                x-transition:enter-start="opacity-0 -translate-y-2" x-transition:enter-end="opacity-100 translate-y-0"
-                class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200
-                                                dark:border-gray-700 p-5 mb-3">
-
-                {{-- En-tête de la barre --}}
-                <div class="flex items-center justify-between mb-3">
-                    <div class="flex items-center gap-2 min-w-0">
-
-                        {{-- Pastille couleur --}}
-                        <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" :class="{
-                                                    'bg-amber-400':  type === 'factures',
-                                                    'bg-teal-400':   type === 'prestations',
-                                                    'bg-blue-400':   type === 'paiements',
-                                                    'bg-green-400':  type === 'factures_payees',
-                                                    'bg-purple-400': type === 'prestations_payees',
-                                                    'animate-pulse': prog.status === 'processing',
-                                                }"></span>
-
-                        {{-- Label lisible --}}
-                        <span class="text-sm font-semibold text-gray-800 dark:text-gray-100" x-text="{
-                                                    factures:           'Factures',
-                                                    prestations:        'Prestations',
-                                                    paiements:          'Paiements',
-                                                    factures_payees:    'Factures Payées',
-                                                    prestations_payees: 'Prestations Payées',
-                                                }[type] ?? type"></span>
-
-                        {{-- Badge statut --}}
-                        <span class="px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0" :class="{
-                                                    'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300': prog.status === 'pending',
-                                                    'bg-blue-100   text-blue-700   dark:bg-blue-900/50   dark:text-blue-300':   prog.status === 'processing',
-                                                    'bg-green-100  text-green-700  dark:bg-green-900/50  dark:text-green-300':  prog.status === 'completed',
-                                                    'bg-red-100    text-red-700    dark:bg-red-900/50    dark:text-red-300':    prog.status === 'failed',
-                                                }"
-                            x-text="{ pending: 'En attente', processing: 'En cours', completed: 'Terminé', failed: 'Échec' }[prog.status] ?? prog.status">
-                        </span>
-
-                        {{-- Temps écoulé --}}
-                        <span class="text-xs text-gray-400 dark:text-gray-500 truncate hidden sm:block"
-                            x-text="prog.started_at ? 'démarré ' + prog.started_at : ''">
-                        </span>
+        <div x-show="Object.keys(progress).length" x-cloak class="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2">
+            <template x-for="item in Object.values(progress)" :key="item.id">
+                <div class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
+                    <div class="flex items-center justify-between gap-3">
+                        <div>
+                            <p class="text-sm font-semibold" x-text="item.type"></p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400" x-text="item.status"></p>
+                        </div>
+                        <span class="text-sm font-bold" x-text="`${item.percentage || 0}%`"></span>
                     </div>
-
-                    {{-- Pourcentage --}}
-                    <span class="text-sm font-bold tabular-nums ml-3 flex-shrink-0" :class="{
-                                                      'text-gray-700 dark:text-gray-300': prog.status !== 'completed' && prog.status !== 'failed',
-                                                      'text-green-600': prog.status === 'completed',
-                                                      'text-red-600':   prog.status === 'failed',
-                                                  }" x-text="prog.percentage + '%'">
-                    </span>
-                </div>
-
-                {{-- Barre de progression --}}
-                <div class="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2 overflow-hidden mb-3">
-                    <div class="h-2 rounded-full transition-all duration-500 ease-out" :class="{
-                                                'bg-amber-400':  type === 'factures'           && prog.status !== 'completed' && prog.status !== 'failed',
-                                                'bg-teal-400':   type === 'prestations'        && prog.status !== 'completed' && prog.status !== 'failed',
-                                                'bg-blue-400':   type === 'paiements'          && prog.status !== 'completed' && prog.status !== 'failed',
-                                                'bg-green-400':  type === 'factures_payees'    && prog.status !== 'completed' && prog.status !== 'failed',
-                                                'bg-purple-400': type === 'prestations_payees' && prog.status !== 'completed' && prog.status !== 'failed',
-                                                'bg-green-500':  prog.status === 'completed',
-                                                'bg-red-500':    prog.status === 'failed',
-                                            }" :style="'width: ' + prog.percentage + '%'">
+                    <div class="mt-3 h-2 rounded-full bg-gray-100 dark:bg-gray-700">
+                        <div class="h-2 rounded-full bg-primary-600 transition-all" :style="`width: ${item.percentage || 0}%`"></div>
                     </div>
+                    <p class="mt-2 text-xs text-gray-500 dark:text-gray-400" x-text="`${item.processed || 0}/${item.total || 0} lignes · ${item.eta || 'ETA indisponible'}`"></p>
                 </div>
+            </template>
+        </div>
+    </section>
 
-                {{-- Compteurs --}}
-                <div class="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs">
-                    <span class="text-gray-500 dark:text-gray-400 tabular-nums">
-                        <strong class="text-gray-800 dark:text-gray-200"
-                            x-text="prog.processed.toLocaleString('fr-FR')"></strong>
-                        <span x-text="' / ' + prog.total.toLocaleString('fr-FR') + ' lignes'"></span>
-                    </span>
-
-                    <span x-show="prog.failed > 0" class="text-red-500 font-medium">
-                        <i class="fa-solid fa-triangle-exclamation mr-1"></i>
-                        <span x-text="prog.failed.toLocaleString('fr-FR')"></span> ignorées
-                    </span>
-
-                    <span x-show="prog.status === 'completed'" class="text-green-600 dark:text-green-400 font-medium">
-                        <i class="fa-solid fa-circle-check mr-1"></i>
-                        Terminé le <span x-text="prog.completed_at"></span>
-                    </span>
-
-                    <span x-show="prog.status === 'failed'" class="text-red-500 font-medium">
-                        <i class="fa-solid fa-circle-xmark mr-1"></i>
-                        Import échoué — consultez les logs Laravel
-                    </span>
-
-                    <span x-show="prog.status === 'pending'" class="text-gray-400 dark:text-gray-500 italic">
-                        En attente du job précédent…
-                    </span>
-
-                    <span x-show="prog.status === 'processing' && prog.eta" class="text-gray-500 dark:text-gray-400 tabular-nums">
-                        <i class="fa-solid fa-stopwatch mr-1"></i>
-                        ETA <span x-text="prog.eta"></span>
-                        <span x-show="prog.rows_per_second">(<span x-text="prog.rows_per_second"></span> lignes/s)</span>
-                    </span>
-                </div>
+    <form method="GET" action="{{ route('admin.imports.index') }}" class="ui-card p-4">
+        <div class="grid grid-cols-1 gap-3 lg:grid-cols-12">
+            <div class="lg:col-span-4"><x-search-input name="search" placeholder="Fichier, type, statut..." /></div>
+            <div class="lg:col-span-2">
+                <select name="status" class="ui-input" aria-label="Statut">
+                    <option value="">Tous statuts</option>
+                    @foreach(['pending' => 'En attente', 'processing' => 'En cours', 'completed' => 'Termine', 'failed' => 'Echec'] as $value => $label)
+                        <option value="{{ $value }}" @selected(request('status') === $value)>{{ $label }}</option>
+                    @endforeach
+                </select>
             </div>
-        </template>
-
-        {{-- ── Historique des imports ───────────────────────────────────────────────── --}}
-        <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-
-            <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
-                <h2 class="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                    <i class="fa-solid fa-clock-rotate-left text-gray-400"></i>
-                    Historique des imports
-                </h2>
-                <span class="text-xs text-gray-400 dark:text-gray-500">
-                    {{ $batches->total() }} import(s) au total
-                </span>
+            <div class="lg:col-span-2">
+                <select name="type" class="ui-input" aria-label="Type">
+                    <option value="">Tous types</option>
+                    @foreach(['factures', 'prestations', 'paiements', 'factures_payees', 'prestations_payees'] as $type)
+                        <option value="{{ $type }}" @selected(request('type') === $type)>{{ ucfirst(str_replace('_', ' ', $type)) }}</option>
+                    @endforeach
+                </select>
             </div>
+            <div class="lg:col-span-2">
+                <select name="per_page" class="ui-input" aria-label="Entrees">
+                    @foreach([10, 20, 50, 100] as $size)
+                        <option value="{{ $size }}" @selected((int) request('per_page', 20) === $size)>{{ $size }} / page</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="flex gap-2 lg:col-span-2">
+                <button type="submit" class="ui-btn-primary flex-1">Filtrer</button>
+                @if($activeFilters)
+                    <a href="{{ route('admin.imports.index') }}" class="ui-btn-secondary"><i data-lucide="rotate-ccw" class="h-4 w-4"></i></a>
+                @endif
+            </div>
+        </div>
+        <div class="mt-4 border-t border-gray-200 pt-4 dark:border-gray-700">
+            <x-date-range-picker />
+        </div>
+    </form>
 
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm">
-                    <thead class="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-700">
-                        <tr class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                            <th class="px-5 py-3 text-left">Fichier</th>
-                            <th class="px-5 py-3 text-left">Type</th>
-                            <th class="px-5 py-3 text-left">Statut</th>
-                            <th class="px-5 py-3 text-right">Lignes</th>
-                            <th class="px-5 py-3 text-right hidden md:table-cell">Ignorées</th>
-                            <th class="px-5 py-3 text-left hidden sm:table-cell">Date</th>
-                            <th class="px-5 py-3 text-left hidden md:table-cell">Par</th>
-                            {{-- En-tête --}}
-                            <th class="px-5 py-3 text-center hidden md:table-cell">Action</th>
+    <section class="ui-card overflow-hidden">
+        @if($batches->isEmpty())
+            <div class="p-4">
+                <x-empty-state icon="upload-cloud" title="Aucun import" message="L'historique des imports apparaitra ici apres le premier depot." />
+            </div>
+        @else
+            <div class="hidden md:block">
+                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <thead class="bg-gray-50 dark:bg-gray-900/60">
+                        <tr>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">Fichier</th>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">Type</th>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">Statut</th>
+                            <th scope="col" class="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-500">Lignes</th>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">Cree par</th>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">Date</th>
+                            <th scope="col" class="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-500">Actions</th>
                         </tr>
                     </thead>
-                    <tbody id="import-history-body" class="divide-y divide-gray-100 dark:divide-gray-700">
-                        @forelse($batches as $batch)
-                            @php
-                                $typeColors = [
-                                    'factures' => 'bg-amber-100  text-amber-800  dark:bg-amber-900/50  dark:text-amber-200',
-                                    'prestations' => 'bg-teal-100   text-teal-800   dark:bg-teal-900/50   dark:text-teal-200',
-                                    'paiements' => 'bg-blue-100   text-blue-800   dark:bg-blue-900/50   dark:text-blue-200',
-                                    'factures_payees' => 'bg-green-100  text-green-800  dark:bg-green-900/50  dark:text-green-200',
-                                    'prestations_payees' => 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-200',
-                                ];
-                                $typeLabels = [
-                                    'factures' => 'Factures',
-                                    'prestations' => 'Prestations',
-                                    'paiements' => 'Paiements',
-                                    'factures_payees' => 'Factures Payées',
-                                    'prestations_payees' => 'Prestations Payées',
-                                ];
-                                $statusColors = [
-                                    'pending' => 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300',
-                                    'processing' => 'bg-blue-100   text-blue-700   dark:bg-blue-900/50   dark:text-blue-300',
-                                    'completed' => 'bg-green-100  text-green-700  dark:bg-green-900/50  dark:text-green-300',
-                                    'failed' => 'bg-red-100    text-red-700    dark:bg-red-900/50    dark:text-red-300',
-                                ];
-                                $statusLabels = [
-                                    'pending' => 'En attente',
-                                    'processing' => 'En cours',
-                                    'completed' => 'Terminé',
-                                    'failed' => 'Échec',
-                                ];
-                                $progressPct = $batch->total_rows > 0
-                                    ? min(100, round($batch->processed_rows / $batch->total_rows * 100))
-                                    : ($batch->status === 'completed' ? 100 : 0);
-                            @endphp
-                            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
-
-                                {{-- Fichier --}}
-                                <td class="px-5 py-3 max-w-[180px]">
-                                    <span class="font-mono text-xs text-gray-700 dark:text-gray-300 block truncate"
-                                        title="{{ $batch->original_filename }}">
-                                        {{ $batch->original_filename }}
-                                    </span>
+                    <tbody class="divide-y divide-gray-200 dark:divide-gray-700" x-ref="historyTable">
+                        @foreach($batches as $batch)
+                            <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                                <td class="px-4 py-4">
+                                    <p class="max-w-xs truncate text-sm font-semibold text-gray-900 dark:text-gray-100">{{ $batch->original_filename }}</p>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">#{{ $batch->id }}</p>
                                 </td>
-
-                                {{-- Type --}}
-                                <td class="px-5 py-3">
-                                    <span
-                                        class="px-2 py-0.5 rounded-full text-xs font-medium
-                                                                                                 {{ $typeColors[$batch->type] ?? 'bg-gray-100 text-gray-600' }}">
-                                        {{ $typeLabels[$batch->type] ?? ucfirst($batch->type) }}
-                                    </span>
-                                </td>
-
-                                {{-- Statut --}}
-                                <td class="px-5 py-3">
-                                    <div class="flex flex-col gap-1">
-                                        <span
-                                            class="px-2 py-0.5 rounded-full text-xs font-medium w-fit
-                                                                                                     {{ $statusColors[$batch->status] ?? '' }}">
-                                            {{ $statusLabels[$batch->status] ?? $batch->status }}
-                                        </span>
-                                        @if(in_array($batch->status, ['processing', 'completed']))
-                                            <div class="w-20 h-1 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
-                                                <div class="h-1 rounded-full {{ $batch->status === 'completed' ? 'bg-green-500' : 'bg-blue-400' }}"
-                                                    style="width: {{ $progressPct }}%"></div>
-                                            </div>
+                                <td class="px-4 py-4 text-sm">{{ ucfirst(str_replace('_', ' ', $batch->type)) }}</td>
+                                <td class="px-4 py-4"><x-badge :status="$batch->status" /></td>
+                                <td class="px-4 py-4 text-right text-sm tabular-nums">{{ number_format($batch->processed_rows, 0, ',', ' ') }} / {{ number_format($batch->total_rows, 0, ',', ' ') }}</td>
+                                <td class="px-4 py-4 text-sm">{{ $batch->creator?->name ?? '-' }}</td>
+                                <td class="px-4 py-4 text-sm">{{ optional($batch->created_at)->format('d/m/Y H:i') }}</td>
+                                <td class="px-4 py-4">
+                                    <div class="flex justify-end gap-2">
+                                        @if($batch->status !== 'processing')
+                                            <button type="button" class="ui-icon-btn" @click="resume({{ $batch->id }})" aria-label="Relancer l'import"><i data-lucide="refresh-cw" class="h-4 w-4"></i></button>
+                                        @endif
+                                        @if(in_array($batch->status, ['completed', 'failed', 'pending'], true))
+                                            <button type="button" class="ui-icon-btn text-danger-600 dark:text-danger-300" @click="destroy({{ $batch->id }})" aria-label="Supprimer l'import"><i data-lucide="trash-2" class="h-4 w-4"></i></button>
                                         @endif
                                     </div>
                                 </td>
-                                {{-- Lignes --}}
-                                <td class="px-5 py-3 text-right tabular-nums">
-                                    <span class="font-medium text-gray-800 dark:text-gray-200 text-xs">
-                                        {{ number_format($batch->processed_rows, 0, ',', ' ') }}
-                                    </span>
-                                    <span class="text-gray-400 text-xs">
-                                        / {{ number_format($batch->total_rows, 0, ',', ' ') }}
-                                    </span>
-                                    <div class="text-[10px] text-gray-400 mt-1">
-                                        +{{ number_format($batch->created_rows ?? 0, 0, ',', ' ') }}
-                                        / ~{{ number_format($batch->updated_rows ?? 0, 0, ',', ' ') }}
-                                        / ={{ number_format($batch->skipped_rows ?? 0, 0, ',', ' ') }}
-                                    </div>
-                                </td>
-
-                                {{-- Ignorées --}}
-                                <td class="px-5 py-3 text-right hidden md:table-cell">
-                                    @if($batch->failed_rows > 0)
-                                        <span class="text-red-500 text-xs font-medium tabular-nums">
-                                            {{ number_format($batch->failed_rows, 0, ',', ' ') }}
-                                        </span>
-                                    @else
-                                        <span class="text-gray-300 dark:text-gray-600 text-xs">—</span>
-                                    @endif
-                                </td>
-
-                                {{-- Date --}}
-                                <td class="px-5 py-3 hidden sm:table-cell">
-                                    <span class="text-gray-500 dark:text-gray-400 text-xs tabular-nums">
-                                        {{ $batch->created_at->format('d/m/Y') }}
-                                    </span>
-                                    <span class="text-gray-400 dark:text-gray-500 text-xs block">
-                                        {{ $batch->created_at->format('H:i') }}
-                                    </span>
-                                </td>
-
-                                {{-- Par --}}
-                                <td class="px-5 py-3 hidden md:table-cell">
-                                    <span class="text-gray-500 dark:text-gray-400 text-xs">
-                                        {{ $batch->creator?->name ?? '—' }}
-                                    </span>
-                                </td>
-
-
-                                {{-- Cellule dans le @forelse --}}
-                                <td class="px-5 py-3 text-center hidden md:table-cell">
-                                    @if(in_array($batch->status, ['completed', 'failed', 'pending']))
-                                        <button onclick="deleteBatch({{ $batch->id }}, '{{ $batch->original_filename }}')"
-                                            class="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50
-                                                                                           dark:hover:bg-red-900/20 rounded-lg transition-all" title="Supprimer">
-                                            <i class="fa-solid fa-trash text-sm"></i>
-                                        </button>
-                                    @else
-                                        {{-- En cours : bouton désactivé --}}
-                                        <span class="p-1.5 text-gray-200 dark:text-gray-600 cursor-not-allowed"
-                                            title="Import en cours — suppression impossible">
-                                            <i class="fa-solid fa-trash text-sm"></i>
-                                        </span>
-                                    @endif
-                                </td>
                             </tr>
-                        @empty
-                            <tr>
-                                <td colspan="7" class="px-5 py-12 text-center">
-                                    <i class="fa-solid fa-inbox text-4xl text-gray-200 dark:text-gray-600 mb-3 block"></i>
-                                    <p class="text-gray-400 dark:text-gray-500 text-sm">Aucun import effectué.</p>
-                                </td>
-                            </tr>
-                        @endforelse
+                        @endforeach
                     </tbody>
                 </table>
             </div>
 
-            @if($batches->hasPages())
-                <div class="px-5 py-3 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/30">
-                    {{ $batches->links() }}
-                </div>
-            @endif
-        </div>
-    </div>
-    <script>
-        // ── Fonction globale (EN DEHORS de importUploader) ────────────────────────
-        async function deleteBatch(id, filename) {
-            if (!confirm(`Supprimer l'import "${filename}" ?\nLe fichier Excel sera également effacé.`)) {
-                return;
-            }
+            <div class="space-y-3 p-4 md:hidden">
+                @foreach($batches as $batch)
+                    <article class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="min-w-0">
+                                <p class="truncate font-semibold">{{ $batch->original_filename }}</p>
+                                <p class="text-sm text-gray-500 dark:text-gray-400">{{ ucfirst(str_replace('_', ' ', $batch->type)) }}</p>
+                            </div>
+                            <x-badge :status="$batch->status" />
+                        </div>
+                        <div class="mt-4 h-2 rounded-full bg-gray-100 dark:bg-gray-700">
+                            @php
+                                $percent = $batch->total_rows > 0 ? min(100, round($batch->processed_rows / $batch->total_rows * 100)) : ($batch->status === 'completed' ? 100 : 0);
+                            @endphp
+                            <div class="h-2 rounded-full bg-primary-600" style="width: {{ $percent }}%"></div>
+                        </div>
+                        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">{{ number_format($batch->processed_rows, 0, ',', ' ') }} / {{ number_format($batch->total_rows, 0, ',', ' ') }} lignes</p>
+                    </article>
+                @endforeach
+            </div>
 
-            try {
-                const res = await fetch(`{{ url('admin/imports') }}/${id}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'Accept': 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                    },
-                });
-
-                const data = await res.json();
-
-                if (!res.ok) {
-                    alert(data.message ?? 'Erreur lors de la suppression.');
-                    return;
-                }
-
-                window.location.reload();
-
-            } catch (err) {
-                alert('Erreur réseau : ' + err.message);
-            }
-        }
-
-        // ── Composant Alpine.js ───────────────────────────────────────────────────
-        function importUploader() {
-            return {
-                files: {
-                    factures: null,
-                    prestations: null,
-                    paiements: null,
-                    factures_payees: null,
-                    prestations_payees: null,
-                },
-                adaptiveFiles: [],
-                forceImport: false,
-                previewReport: null,
-
-                isProcessing: false,
-                pollingInterval: null,
-                historyPollingInterval: null,
-
-                batchIds: {
-                    factures: null,
-                    prestations: null,
-                    paiements: null,
-                    factures_payees: null,
-                    prestations_payees: null,
-                },
-
-                progresses: {
-                    factures: { visible: false, status: 'pending', processed: 0, total: 0, failed: 0, percentage: 0, started_at: null, completed_at: null },
-                    prestations: { visible: false, status: 'pending', processed: 0, total: 0, failed: 0, percentage: 0, started_at: null, completed_at: null },
-                    paiements: { visible: false, status: 'pending', processed: 0, total: 0, failed: 0, percentage: 0, started_at: null, completed_at: null },
-                    factures_payees: { visible: false, status: 'pending', processed: 0, total: 0, failed: 0, percentage: 0, started_at: null, completed_at: null },
-                    prestations_payees: { visible: false, status: 'pending', processed: 0, total: 0, failed: 0, percentage: 0, started_at: null, completed_at: null },
-                },
-
-                // ── Computed ──────────────────────────────────────────────────────
-                get hasAnyFile() {
-                    return this.adaptiveFiles.length > 0 || Object.values(this.files).some(f => f !== null);
-                },
-
-                get fileCount() {
-                    return this.adaptiveFiles.length + Object.values(this.files).filter(f => f !== null).length;
-                },
-
-                get allDone() {
-                    return Object.entries(this.batchIds).every(([type, id]) => {
-                        if (!id) return true;
-                        const s = this.progresses[type].status;
-                        return s === 'completed' || s === 'failed';
-                    });
-                },
-
-                // ── Init ──────────────────────────────────────────────────────────
-                init() {
-                    this.refreshHistory();
-                    this.historyPollingInterval = setInterval(() => this.refreshHistory(), 5000);
-                },
-
-                setAdaptiveFiles(event) {
-                    this.adaptiveFiles = Array.from(event.target.files || []).slice(0, 5);
-                    this.previewReport = null;
-                },
-
-                appendFiles(formData) {
-                    formData.append('_token', '{{ csrf_token() }}');
-                    formData.append('force_import', this.forceImport ? '1' : '0');
-                    this.adaptiveFiles.forEach(file => formData.append('files[]', file));
-                    if (this.files.factures) formData.append('file_factures', this.files.factures);
-                    if (this.files.prestations) formData.append('file_prestations', this.files.prestations);
-                    if (this.files.paiements) formData.append('file_paiements', this.files.paiements);
-                    if (this.files.factures_payees) formData.append('file_factures_payees', this.files.factures_payees);
-                    if (this.files.prestations_payees) formData.append('file_prestations_payees', this.files.prestations_payees);
-                },
-
-                formatAmount(value) {
-                    return Number(value || 0).toLocaleString('fr-DZ', { maximumFractionDigits: 2 });
-                },
-
-                async preview() {
-                    if (!this.hasAnyFile || this.isProcessing) return;
-                    const formData = new FormData();
-                    this.appendFiles(formData);
-
-                    try {
-                        const res = await fetch('{{ route("admin.imports.preview") }}', {
-                            method: 'POST',
-                            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-                            body: formData,
-                        });
-                        const data = await res.json();
-                        if (!res.ok) throw new Error(data.message ?? 'Erreur preview');
-                        this.previewReport = data;
-                    } catch (err) {
-                        alert('Erreur de previsualisation :\n' + err.message);
-                    }
-                },
-
-                // ── Soumission ────────────────────────────────────────────────────
-                async submit() {
-                    if (!this.hasAnyFile || this.isProcessing) return;
-
-                    this.isProcessing = true;
-
-                    const formData = new FormData();
-                    this.appendFiles(formData);
-
-                    try {
-                        const res = await fetch('{{ route("admin.imports.store") }}', {
-                            method: 'POST',
-                            headers: {
-                                'Accept': 'application/json',
-                                'X-Requested-With': 'XMLHttpRequest',
-                            },
-                            body: formData,
-                        });
-
-                        const text = await res.text();
-                        let data;
-
-                        try {
-                            data = JSON.parse(text);
-                        } catch {
-                            console.error('Réponse brute :', text.substring(0, 500));
-                            throw new Error(
-                                res.status === 413
-                                    ? 'Fichier trop volumineux. Augmentez upload_max_filesize dans php.ini.'
-                                    : `Réponse non-JSON (HTTP ${res.status}). Voir la console.`
-                            );
-                        }
-
-                        if (!res.ok) {
-                            console.error('Erreur serveur :', data);
-                            throw new Error(
-                                data.message
-                                ?? Object.values(data.errors ?? {}).flat().join('\n')
-                                ?? `Erreur ${res.status}`
-                            );
-                        }
-
-                        // Initialiser les barres pour chaque batch créé
-                        for (const [type, id] of Object.entries(data.batch_ids)) {
-                            this.batchIds[type] = id;
-                            this.progresses[type].visible = true;
-                            this.progresses[type].status = 'pending';
-                            this.progresses[type].percentage = 0;
-                            this.progresses[type].processed = 0;
-                            this.progresses[type].total = 0;
-                        }
-
-                        this.startPolling();
-
-                    } catch (err) {
-                        alert('Erreur lors de l\'upload :\n' + err.message);
-                        this.isProcessing = false;
-                    }
-                },
-
-                // ── Polling ───────────────────────────────────────────────────────
-                startPolling() {
-                    if (this.pollingInterval) clearInterval(this.pollingInterval);
-                    this.fetchAllProgress();
-                    this.pollingInterval = setInterval(() => this.fetchAllProgress(), 2000);
-                },
-
-                async fetchAllProgress() {
-                    const ids = Object.values(this.batchIds).filter(Boolean).join(',');
-                    const data = await this.fetchProgressSnapshot(ids);
-
-                    for (const [type, id] of Object.entries(this.batchIds)) {
-                        if (!id || !data.progress?.[id]) continue;
-
-                        this.progresses[type] = {
-                            ...this.progresses[type],
-                            ...data.progress[id],
-                            visible: true,
-                        };
-                    }
-
-                    if (data.history) this.renderHistoryRows(data.history);
-
-                    if (this.allDone) {
-                        clearInterval(this.pollingInterval);
-                        this.pollingInterval = null;
-                        this.isProcessing = false;
-                        this.refreshHistory();
-                    }
-                },
-
-                async refreshHistory() {
-                    const data = await this.fetchProgressSnapshot('');
-                    if (data.history) this.renderHistoryRows(data.history);
-                },
-
-                async fetchProgressSnapshot(ids) {
-                    const url = ids
-                        ? `{{ route("admin.imports.progress-many") }}?ids=${encodeURIComponent(ids)}`
-                        : `{{ route("admin.imports.progress-many") }}`;
-
-                    try {
-                        const res = await fetch(url, {
-                            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-                        });
-
-                        return res.ok ? await res.json() : { progress: {}, history: null };
-                    } catch (err) {
-                        console.error('Polling imports :', err);
-                        return { progress: {}, history: null };
-                    }
-                },
-
-                async fetchProgress(type) {
-                    const id = this.batchIds[type];
-                    if (!id) return;
-
-                    try {
-                        const res = await fetch(`{{ url('admin/imports') }}/${id}/progress`);
-                        if (!res.ok) return;
-                        const data = await res.json();
-
-                        this.progresses[type] = {
-                            ...this.progresses[type],
-                            ...data,
-                            visible: true,
-                        };
-                    } catch (err) {
-                        console.error(`Polling [${type}] :`, err);
-                    }
-                },
-
-                renderHistoryRows(rows) {
-                    const tbody = document.getElementById('import-history-body');
-                    if (!tbody) return;
-
-                    if (!rows.length) {
-                        tbody.innerHTML = `
-                            <tr>
-                                <td colspan="8" class="px-5 py-12 text-center">
-                                    <i class="fa-solid fa-inbox text-4xl text-gray-200 dark:text-gray-600 mb-3 block"></i>
-                                    <p class="text-gray-400 dark:text-gray-500 text-sm">Aucun import effectue.</p>
-                                </td>
-                            </tr>`;
-                        return;
-                    }
-
-                    tbody.innerHTML = rows.map(row => {
-                        const pct = Number(row.percentage || 0);
-                        const deleteAction = row.can_delete
-                            ? `<button onclick="deleteBatch(${row.id}, '${this.escapeJs(row.filename)}')" class="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all" title="Supprimer"><i class="fa-solid fa-trash text-sm"></i></button>`
-                            : `<span class="p-1.5 text-gray-200 dark:text-gray-600 cursor-not-allowed" title="Import en cours"><i class="fa-solid fa-trash text-sm"></i></span>`;
-
-                        return `
-                            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
-                                <td class="px-5 py-3 max-w-[180px]">
-                                    <span class="font-mono text-xs text-gray-700 dark:text-gray-300 block truncate" title="${this.escapeHtml(row.filename)}">${this.escapeHtml(row.filename)}</span>
-                                </td>
-                                <td class="px-5 py-3">
-                                    <span class="px-2 py-0.5 rounded-full text-xs font-medium ${this.typeClass(row.type)}">${this.escapeHtml(row.type_label)}</span>
-                                </td>
-                                <td class="px-5 py-3">
-                                    <div class="flex flex-col gap-1">
-                                        <span class="px-2 py-0.5 rounded-full text-xs font-medium w-fit ${this.statusClass(row.status)}">${this.escapeHtml(row.status_label)}</span>
-                                        <div class="w-20 h-1 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
-                                            <div class="h-1 rounded-full ${row.status === 'completed' ? 'bg-green-500' : row.status === 'failed' ? 'bg-red-500' : 'bg-blue-400'}" style="width: ${pct}%"></div>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td class="px-5 py-3 text-right tabular-nums">
-                                    <span class="font-medium text-gray-800 dark:text-gray-200 text-xs">${this.num(row.processed)}</span>
-                                    <span class="text-gray-400 text-xs">/ ${this.num(row.total)} lignes</span>
-                                    <div class="text-[10px] text-gray-400 mt-1">+${this.num(row.created)} / ~${this.num(row.updated)} / =${this.num(row.skipped)}</div>
-                                </td>
-                                <td class="px-5 py-3 text-right hidden md:table-cell">
-                                    ${row.failed > 0 ? `<span class="text-red-500 text-xs font-medium tabular-nums">${this.num(row.failed)}</span>` : '<span class="text-gray-300 dark:text-gray-600 text-xs">-</span>'}
-                                </td>
-                                <td class="px-5 py-3 hidden sm:table-cell">
-                                    <span class="text-gray-500 dark:text-gray-400 text-xs tabular-nums">${this.escapeHtml(row.created_date || '')}</span>
-                                    <span class="text-gray-400 dark:text-gray-500 text-xs block">${this.escapeHtml(row.created_time || '')}</span>
-                                </td>
-                                <td class="px-5 py-3 hidden md:table-cell">
-                                    <span class="text-gray-500 dark:text-gray-400 text-xs">${this.escapeHtml(row.creator || '-')}</span>
-                                </td>
-                                <td class="px-5 py-3 text-center hidden md:table-cell">${deleteAction}</td>
-                            </tr>`;
-                    }).join('');
-                },
-
-                num(value) {
-                    return Number(value || 0).toLocaleString('fr-FR');
-                },
-
-                typeClass(type) {
-                    return {
-                        factures: 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200',
-                        prestations: 'bg-teal-100 text-teal-800 dark:bg-teal-900/50 dark:text-teal-200',
-                        paiements: 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-200',
-                        factures_payees: 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-200',
-                        prestations_payees: 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-200',
-                    }[type] || 'bg-gray-100 text-gray-600';
-                },
-
-                statusClass(status) {
-                    return {
-                        pending: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300',
-                        processing: 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300',
-                        completed: 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300',
-                        failed: 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300',
-                    }[status] || 'bg-gray-100 text-gray-600';
-                },
-
-                escapeHtml(value) {
-                    return String(value ?? '')
-                        .replace(/&/g, '&amp;')
-                        .replace(/</g, '&lt;')
-                        .replace(/>/g, '&gt;')
-                        .replace(/"/g, '&quot;')
-                        .replace(/'/g, '&#039;');
-                },
-
-                escapeJs(value) {
-                    return String(value ?? '')
-                        .replace(/\\/g, '\\\\')
-                        .replace(/'/g, "\\'")
-                        .replace(/\n/g, ' ');
-                },
-
-                destroy() {
-                    if (this.pollingInterval) clearInterval(this.pollingInterval);
-                    if (this.historyPollingInterval) clearInterval(this.historyPollingInterval);
-                },
-            };
-        }
-    </script>
+            <div class="border-t border-gray-200 px-4 py-3 dark:border-gray-700">
+                {{ $batches->appends(request()->query())->links() }}
+            </div>
+        @endif
+    </section>
+</div>
 @endsection
+
+@push('scripts')
+<script>
+    function importUploader() {
+        return {
+            files: [],
+            forceImport: false,
+            processing: false,
+            message: '',
+            messageType: 'success',
+            previewRows: [],
+            progress: {},
+            batchIds: [],
+            poller: null,
+            init() {},
+            csrf() {
+                return document.querySelector('meta[name="csrf-token"]').content;
+            },
+            setFiles(event) {
+                this.files = Array.from(event.target.files || []).slice(0, 5);
+                this.previewRows = [];
+                this.message = '';
+                this.$nextTick(() => window.lucide?.createIcons());
+            },
+            setDroppedFiles(event) {
+                this.files = Array.from(event.dataTransfer.files || []).filter(file => /\.(xlsx|xls)$/i.test(file.name)).slice(0, 5);
+                this.previewRows = [];
+                this.message = '';
+                this.$nextTick(() => window.lucide?.createIcons());
+            },
+            formData() {
+                const data = new FormData();
+                this.files.forEach(file => data.append('files[]', file));
+                data.append('force_import', this.forceImport ? '1' : '0');
+                return data;
+            },
+            async preview() {
+                await this.postFiles(@js(route('admin.imports.preview')), true);
+            },
+            async startImport() {
+                await this.postFiles(@js(route('admin.imports.store')), false);
+            },
+            async postFiles(url, previewOnly) {
+                if (!this.files.length) return;
+                this.processing = true;
+                this.message = '';
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'X-CSRF-TOKEN': this.csrf(), 'Accept': 'application/json' },
+                        body: this.formData(),
+                    });
+                    const payload = await response.json();
+                    if (!response.ok) throw new Error(payload.message || 'Operation impossible.');
+                    this.messageType = 'success';
+                    this.message = payload.message || (previewOnly ? 'Previsualisation terminee.' : 'Import lance.');
+                    if (previewOnly) {
+                        this.previewRows = Array.isArray(payload.files) ? payload.files : (Array.isArray(payload.preview) ? payload.preview : Object.values(payload));
+                    } else {
+                        this.batchIds = Object.values(payload.batch_ids || {});
+                        this.progress = {};
+                        this.startPolling();
+                    }
+                } catch (error) {
+                    this.messageType = 'error';
+                    this.message = error.message;
+                } finally {
+                    this.processing = false;
+                    this.$nextTick(() => window.lucide?.createIcons());
+                }
+            },
+            startPolling() {
+                clearInterval(this.poller);
+                this.fetchProgress();
+                this.poller = setInterval(() => this.fetchProgress(), 2500);
+            },
+            async fetchProgress() {
+                const ids = this.batchIds.join(',');
+                const url = ids ? `${@js(route('admin.imports.progress-many'))}?ids=${encodeURIComponent(ids)}` : @js(route('admin.imports.progress-many'));
+                const response = await fetch(url, { headers: { 'Accept': 'application/json' } });
+                const payload = await response.json();
+                this.progress = payload.progress || {};
+                const items = Object.values(this.progress);
+                if (items.length && items.every(item => ['completed', 'failed'].includes(item.status))) {
+                    clearInterval(this.poller);
+                }
+            },
+            async resume(id) {
+                if (!confirm('Relancer cet import ?')) return;
+                await fetch(@js(url('/admin/imports')) + `/${id}/resume`, {
+                    method: 'POST',
+                    headers: { 'X-CSRF-TOKEN': this.csrf(), 'Accept': 'application/json' },
+                });
+                window.location.reload();
+            },
+            async destroy(id) {
+                if (!confirm('Supprimer cet import ?')) return;
+                await fetch(@js(url('/admin/imports')) + `/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'X-CSRF-TOKEN': this.csrf(), 'Accept': 'application/json' },
+                });
+                window.location.reload();
+            },
+            formatBytes(bytes) {
+                if (!bytes) return '0 o';
+                const units = ['o', 'Ko', 'Mo', 'Go'];
+                const index = Math.floor(Math.log(bytes) / Math.log(1024));
+                return `${(bytes / Math.pow(1024, index)).toFixed(1)} ${units[index]}`;
+            }
+        }
+    }
+</script>
+@endpush

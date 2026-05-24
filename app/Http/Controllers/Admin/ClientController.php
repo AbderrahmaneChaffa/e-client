@@ -13,24 +13,45 @@ class ClientController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Client::query();
+        $query = Client::with('users');
 
-        // Search by code_client or name
         if ($request->filled('search')) {
             $search = $request->input('search');
             $query->where(function ($q) use ($search) {
                 $q->where('code_client', 'like', "%{$search}%")
                     ->orWhere('name', 'like', "%{$search}%")
-                    ->orWhere('nis', 'like', "%{$search}%");
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('telephone', 'like', "%{$search}%")
+                    ->orWhere('nis', 'like', "%{$search}%")
+                    ->orWhere('nif', 'like', "%{$search}%")
+                    ->orWhere('rc', 'like', "%{$search}%");
             });
         }
 
-        // Sort
-        $sortBy = $request->input('sort', 'name');
-        $sortDir = $request->input('dir', 'asc');
+        if ($request->filled('date_from')) {
+            $query->whereDate('created_at', '>=', $request->date_from);
+        }
+
+        if ($request->filled('date_to')) {
+            $query->whereDate('created_at', '<=', $request->date_to);
+        }
+
+        if (!$request->filled('date_from') && !$request->filled('date_to') && $request->filled('period')) {
+            match ($request->period) {
+                'today' => $query->whereDate('created_at', today()),
+                'week' => $query->whereBetween('created_at', [now()->startOfWeek(), now()->endOfWeek()]),
+                'month' => $query->whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()]),
+                default => null,
+            };
+        }
+
+        $allowedSorts = ['name', 'code_client', 'created_at', 'email', 'nis', 'nif', 'rc'];
+        $sortBy = in_array($request->input('sort'), $allowedSorts, true) ? $request->input('sort') : 'name';
+        $sortDir = $request->input('dir') === 'desc' ? 'desc' : 'asc';
         $query->orderBy($sortBy, $sortDir);
 
-        $clients = $query->paginate(100);
+        $perPage = min((int) $request->input('per_page', 25), 100);
+        $clients = $query->paginate($perPage)->withQueryString();
 
         return view('admins.clients.index', compact('clients'));
     }

@@ -17,8 +17,13 @@ class PaiementController extends Controller
 
         // Filtre par référence de reçu ou chèque
         if ($request->filled('search')) {
-            $query->where('recu', 'like', '%' . $request->search . '%')
-                ->orWhere('numero_cheque', 'like', '%' . $request->search . '%');
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('recu', 'like', '%' . $search . '%')
+                    ->orWhere('numero_cheque', 'like', '%' . $search . '%')
+                    ->orWhereHas('facture', fn ($invoice) => $invoice->where('numero_facture', 'like', '%' . $search . '%'))
+                    ->orWhereHas('facture.client', fn ($client) => $client->where('name', 'like', '%' . $search . '%'));
+            });
         }
 
         // Filtre par banque
@@ -26,7 +31,20 @@ class PaiementController extends Controller
             $query->where('banque', $request->banque);
         }
 
-        $paiements = $query->orderBy('date_paiement', 'desc')->paginate(100)->withQueryString();
+        if ($request->filled('date_from')) {
+            $query->whereDate('date_paiement', '>=', $request->date_from);
+        }
+
+        if ($request->filled('date_to')) {
+            $query->whereDate('date_paiement', '<=', $request->date_to);
+        }
+
+        $allowedSorts = ['date_paiement', 'montant', 'recu', 'banque'];
+        $sortBy = in_array($request->input('sort'), $allowedSorts, true) ? $request->input('sort') : 'date_paiement';
+        $sortDir = $request->input('dir') === 'asc' ? 'asc' : 'desc';
+        $perPage = min((int) $request->input('per_page', 25), 100);
+
+        $paiements = $query->orderBy($sortBy, $sortDir)->paginate($perPage)->withQueryString();
 
         return view('admins.paiements.index', compact('paiements'));
     }

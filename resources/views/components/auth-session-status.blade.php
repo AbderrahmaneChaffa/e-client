@@ -1,3 +1,4 @@
+{{-- // PURPOSE: Authentication status message block. --}}
 @props(['status'])
 
 @if ($status)
