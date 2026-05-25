@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\ImportBatch;
 use App\Services\ImportVerificationService;
+use App\Services\Notifications\AlertNotificationService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -71,6 +72,8 @@ class VerifyImportJob implements ShouldQueue
                 'completed_at' => now()->toIso8601String(),
                 ...$summary,
             ], now()->addDay());
+
+            app(AlertNotificationService::class)->notifyVerificationCompleted($batch, $this->relatedBatchIds, $summary);
         } catch (\Throwable $e) {
             $releaseGlobalLock = $this->attempts() >= $this->tries;
 
@@ -102,6 +105,8 @@ class VerifyImportJob implements ShouldQueue
 
     public function failed(\Throwable $e): void
     {
+        $batch = $this->batchId ? ImportBatch::find($this->batchId) : null;
+
         $this->putStatus([
             'status' => 'failed',
             'message' => $e->getMessage(),
@@ -118,6 +123,8 @@ class VerifyImportJob implements ShouldQueue
             'related_batch_ids' => $this->relatedBatchIds,
             'message' => $e->getMessage(),
         ]);
+
+        app(AlertNotificationService::class)->notifyVerificationFailed($batch, $this->relatedBatchIds, $e);
     }
 
     private function isGlobalVerification(): bool

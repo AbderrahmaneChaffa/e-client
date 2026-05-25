@@ -163,10 +163,7 @@
                         <i data-lucide="moon" class="h-4 w-4 dark:hidden" aria-hidden="true"></i>
                     </button>
 
-                    <button type="button" class="ui-icon-btn relative" aria-label="Notifications">
-                        <i data-lucide="bell" class="h-4 w-4" aria-hidden="true"></i>
-                        <span class="absolute -right-1 -top-1 h-4 min-w-4 rounded-full bg-danger-600 px-1 text-[10px] font-bold leading-4 text-white">3</span>
-                    </button>
+                    <x-notification-center />
 
                     <div class="relative" x-data="{ open: false }">
                         <button type="button" @click="open = ! open" class="flex items-center gap-2 rounded-full focus:outline-none focus:ring-2 focus:ring-primary-600 focus:ring-offset-2 dark:focus:ring-offset-gray-950">

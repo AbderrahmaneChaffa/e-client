@@ -6,6 +6,7 @@ use App\Imports\Concerns\ParsesExcelData;
 use App\Imports\Concerns\LoadsExistingImportState;
 use App\Imports\Concerns\TracksImportTouchedFactures;
 use App\Models\{Client, Facture, ImportBatch};
+use App\Services\ImportDeltaService;
 use App\Services\ImportRowHasher;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\{Cache, DB, Log};
@@ -38,12 +39,30 @@ class PaiementsImport extends StringValueBinder implements
     private array $clientIdCache = [];
     private array $missingFactures = [];
 
+    private const DIFF_COLUMNS = [
+        'montant',
+        'date_paiement',
+        'numero_cheque',
+        'banque',
+        'facture_anterieur',
+    ];
+
+    private const DIFF_LABELS = [
+        'montant' => 'Montant paye',
+        'date_paiement' => 'Date paiement',
+        'numero_cheque' => 'Cheque',
+        'banque' => 'Banque',
+        'facture_anterieur' => 'Facture anterieure',
+    ];
+
     public function __construct(private readonly ImportBatch $batch)
     {
     }
 
     public function collection(Collection $rows): void
     {
+        $deltaService = app(ImportDeltaService::class);
+
         if ($this->batch->processed_rows === 0) {
             Log::channel('imports')->debug('PAIEMENTS colonnes détectées', [
                 'keys' => array_keys($rows->first()?->toArray() ?? []),
@@ -73,12 +92,18 @@ class PaiementsImport extends StringValueBinder implements
             }
         }
 
-        $existingHashes = $this->existingHashesForFacturePairs('paiements', 'recu', $pairs);
+        $existingRows = $this->existingRowsForFacturePairs('paiements', 'recu', $pairs, self::DIFF_COLUMNS);
+        $factureRows = Facture::whereIn('id', array_filter($this->factureCache))
+            ->get(['id', 'numero_facture', 'reste_a_payer'])
+            ->keyBy('id');
 
         $now = now()->toDateTimeString();
         $userId = $this->batch->created_by;
         $paiements = [];
         $soldesMAJ = [];
+        $diffs = [];
+        $missingDiffs = [];
+        $seenFactureIds = [];
         $createdRows = 0;
         $updatedRows = 0;
         $unchangedRows = 0;
@@ -101,15 +126,54 @@ class PaiementsImport extends StringValueBinder implements
                     $this->missingFactures[$numero] = true;
                     $this->skippedCount++;
                     $missingRows++;
+                    $missingDiffs[$numero.'|'.$recu] = $deltaService->delta(
+                        factureId: null,
+                        entityType: 'paiement',
+                        entityKey: $numero.'|'.$recu,
+                        changeType: 'missing',
+                        severity: 'warning',
+                        label: 'Facture introuvable pour paiement',
+                        differences: [[
+                            'field' => 'facture',
+                            'label' => 'Facture',
+                            'old' => null,
+                            'new' => $numero,
+                            'type' => 'missing',
+                        ]],
+                        context: ['numero_facture' => $numero, 'recu' => $recu],
+                    );
                     continue;
                 }
 
                 $this->factureCache[$numero] = $factureId;
+                $factureRows[$factureId] = (object) [
+                    'id' => $factureId,
+                    'numero_facture' => $numero,
+                    'reste_a_payer' => $this->parseAmount($this->cellValue($row, 'reste', '0')),
+                ];
+                $diffs[] = $deltaService->delta(
+                    factureId: $factureId,
+                    entityType: 'facture',
+                    entityKey: $numero,
+                    changeType: 'new',
+                    severity: 'warning',
+                    label: 'Facture creee depuis paiement',
+                    differences: [[
+                        'field' => 'numero_facture',
+                        'label' => 'Facture',
+                        'old' => null,
+                        'new' => $numero,
+                        'type' => 'new',
+                    ]],
+                    context: ['numero_facture' => $numero, 'source' => 'paiements'],
+                );
             }
 
+            $seenFactureIds[$factureId] = $factureId;
             $rowHash = ImportRowHasher::hash($this->batch->type, $row);
             $existingKey = $factureId.'|'.$recu;
-            $existingHash = $existingHashes[$existingKey] ?? null;
+            $existingRow = $existingRows[$existingKey] ?? null;
+            $existingHash = $existingRow ? ($existingRow->row_hash ?? '__EXISTS_NO_HASH__') : null;
 
             if (
                 ! $this->batch->force_import
@@ -126,7 +190,7 @@ class PaiementsImport extends StringValueBinder implements
             $montant = $this->parseAmount($this->cellValue($row, 'paye', '0'));
             $reste = $this->parseAmount($this->cellValue($row, 'reste', '0'));
 
-            $paiements[] = [
+            $paiement = [
                 'facture_id' => $factureId,
                 'recu' => $recu,
                 'montant' => $montant,
@@ -140,6 +204,38 @@ class PaiementsImport extends StringValueBinder implements
                 'updated_at' => $now,
             ];
 
+            $recordDiff = $deltaService->diffForRecord(
+                entityType: 'paiement',
+                entityKey: $recu,
+                factureId: $factureId,
+                existing: $existingRow,
+                newRecord: $paiement,
+                columns: self::DIFF_COLUMNS,
+                labels: self::DIFF_LABELS,
+                context: ['numero_facture' => $numero, 'recu' => $recu],
+            );
+
+            if ($recordDiff) {
+                $diffs[] = $recordDiff;
+            }
+
+            $soldeDiff = $deltaService->diffForRecord(
+                entityType: 'solde',
+                entityKey: $numero,
+                factureId: $factureId,
+                existing: $factureRows->get($factureId),
+                newRecord: ['reste_a_payer' => $reste],
+                columns: ['reste_a_payer'],
+                labels: ['reste_a_payer' => 'Reste a payer'],
+                context: ['numero_facture' => $numero, 'recu' => $recu],
+                modifiedLabel: 'Solde facture modifie',
+            );
+
+            if ($soldeDiff) {
+                $diffs[] = $soldeDiff;
+            }
+
+            $paiements[] = $paiement;
             $soldesMAJ[$factureId] = $reste;
             $this->localCount++;
         }
@@ -182,6 +278,11 @@ class PaiementsImport extends StringValueBinder implements
 
             $this->recordTouchedFactureIds(array_keys($soldesMAJ));
         }
+
+        $deltaService->record($this->batch, [...array_values($missingDiffs), ...$diffs]);
+        $diffFactureIds = collect($diffs)->pluck('facture_id')->filter()->map(fn ($id) => (int) $id)->unique()->all();
+        $resolvedPaymentIds = array_values(array_diff(array_values($seenFactureIds), $diffFactureIds));
+        $deltaService->clearResolvedFactures($this->batch, $resolvedPaymentIds, 'paiement');
 
         $processedRows = count($paiements) + $unchangedRows + $missingRows;
         Cache::increment("import_batch_{$this->batch->id}", $processedRows);

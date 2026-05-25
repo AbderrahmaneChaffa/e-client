@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\ClientController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\ImportController;
 use App\Http\Controllers\FactureController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PaiementController;
 use App\Http\Controllers\ProfileController;
 use App\UserRole;
@@ -27,6 +28,17 @@ Route::get('/dashboard', function () {
 })->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/notifications', [NotificationController::class, 'index'])
+        ->name('notifications.index');
+    Route::get('/notifications/feed', [NotificationController::class, 'feed'])
+        ->name('notifications.feed');
+    Route::get('/notifications/{notification}', [NotificationController::class, 'open'])
+        ->name('notifications.open');
+    Route::patch('/notifications/{notification}/read', [NotificationController::class, 'markAsRead'])
+        ->name('notifications.read');
+    Route::patch('/notifications/read-all', [NotificationController::class, 'markAllAsRead'])
+        ->name('notifications.read-all');
+
     Route::middleware('role:admin')->group(function () {
         Route::get('/admin/dashboard', [DashboardController::class, 'index'])
             ->name('admin.dashboard');
@@ -47,6 +59,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::get('/progress', [ImportController::class, 'progressMany'])->name('progress-many');
             Route::post('/verify-global', [ImportController::class, 'verifyGlobal'])->name('verify-global');
             Route::get('/verify-global/status', [ImportController::class, 'verifyGlobalStatus'])->name('verify-global.status');
+            Route::get('/{batch}', [ImportController::class, 'show'])->name('show');
             Route::get('/{batch}/progress', [ImportController::class, 'progress'])->name('progress');
             Route::post('/{batch}/resume', [ImportController::class, 'resume'])->name('resume');
             Route::delete('/{batch}', [ImportController::class, 'destroy'])->name('destroy');

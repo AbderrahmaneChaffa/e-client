@@ -14,6 +14,8 @@ use App\Models\ImportBatch;
 use App\Models\Navire;
 use App\Models\Paiement;
 use App\Models\Prestation;
+use App\Services\ImportDeltaService;
+use App\Services\Notifications\AlertNotificationService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -83,6 +85,7 @@ class ProcessImportJob implements ShouldQueue
                 'started_at' => now(),
                 'completed_at' => null,
             ]);
+            app(ImportDeltaService::class)->resetBatch($batch);
 
             Log::channel('imports')->info('Import started', [
                 'batch_id' => $batch->id,
@@ -109,6 +112,17 @@ class ProcessImportJob implements ShouldQueue
                 $import->logMissingFactures();
             }
 
+            if ($batch->type === 'factures') {
+                $missingExisting = app(ImportDeltaService::class)->markMissingFacturesFromSnapshot($batch);
+
+                if ($missingExisting > 0) {
+                    Log::channel('imports')->warning('Existing invoices missing from imported factures snapshot', [
+                        'batch_id' => $batch->id,
+                        'missing_existing_factures' => $missingExisting,
+                    ]);
+                }
+            }
+
             $freshBatch = $batch->fresh();
             $finalProcessed = max(
                 (int) Cache::get("import_batch_{$batch->id}", 0),
@@ -120,6 +134,7 @@ class ProcessImportJob implements ShouldQueue
                 'processed_rows' => $finalProcessed,
                 'completed_at' => now(),
             ]);
+            app(AlertNotificationService::class)->notifyImportCompleted($batch);
 
             $duration = max(microtime(true) - $startedAt, 0.001);
 
@@ -165,6 +180,12 @@ class ProcessImportJob implements ShouldQueue
             'completed_at' => now(),
             'error_summary' => ['message' => $e->getMessage()],
         ]);
+
+        $batch = ImportBatch::find($this->batchId);
+
+        if ($batch) {
+            app(AlertNotificationService::class)->notifyImportFailed($batch, $e);
+        }
     }
 
     private function completeFromPreviousIdenticalImport(ImportBatch $batch): bool
@@ -210,6 +231,8 @@ class ProcessImportJob implements ShouldQueue
             'duplicate_of' => $previous->id,
             'rows' => $previous->total_rows,
         ]);
+
+        app(AlertNotificationService::class)->notifyImportCompleted($batch);
 
         return true;
     }

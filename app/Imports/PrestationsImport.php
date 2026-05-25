@@ -6,6 +6,7 @@ use App\Imports\Concerns\ParsesExcelData;
 use App\Imports\Concerns\LoadsExistingImportState;
 use App\Imports\Concerns\TracksImportTouchedFactures;
 use App\Models\{Facture, ImportBatch};
+use App\Services\ImportDeltaService;
 use App\Services\ImportRowHasher;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\{Cache, DB, Log};
@@ -37,12 +38,33 @@ class PrestationsImport extends StringValueBinder implements
     private array $missingFactures = [];
     private array $factureIdCache = [];
 
+    private const DIFF_COLUMNS = [
+        'libelle',
+        'quantite',
+        'prix_unitaire',
+        'taux_ht',
+        'total_ht',
+        'total_tva',
+        'total_ttc',
+    ];
+
+    private const DIFF_LABELS = [
+        'libelle' => 'Libelle',
+        'quantite' => 'Quantite',
+        'prix_unitaire' => 'Prix unitaire',
+        'taux_ht' => 'Taux HT',
+        'total_ht' => 'Total HT',
+        'total_tva' => 'TVA',
+        'total_ttc' => 'Total TTC',
+    ];
+
     public function __construct(private readonly ImportBatch $batch)
     {
     }
 
     public function collection(Collection $rows): void
     {
+        $deltaService = app(ImportDeltaService::class);
         $numeros = $rows
             ->map(fn ($row) => trim((string) $this->cellValue($row, 'facture', '')))
             ->filter()
@@ -66,16 +88,19 @@ class PrestationsImport extends StringValueBinder implements
             }
         }
 
-        $existingHashes = $this->existingHashesForFacturePairs('prestations', 'article', $pairs);
+        $existingRows = $this->existingRowsForFacturePairs('prestations', 'article', $pairs, self::DIFF_COLUMNS);
 
         $now = now()->toDateTimeString();
         $upserts = [];
+        $diffs = [];
+        $missingDiffs = [];
         $createdRows = 0;
         $updatedRows = 0;
         $unchangedRows = 0;
         $missingRows = 0;
         $changedRows = 0;
         $touchedFactureIds = [];
+        $seenFactureIds = [];
 
         foreach ($rows as $row) {
             $numero = trim((string) $this->cellValue($row, 'facture', ''));
@@ -91,12 +116,30 @@ class PrestationsImport extends StringValueBinder implements
                 $this->missingFactures[$numero] = true;
                 $this->skippedCount++;
                 $missingRows++;
+                $missingDiffs[$numero.'|'.$article] = $deltaService->delta(
+                    factureId: null,
+                    entityType: 'prestation',
+                    entityKey: $numero.'|'.$article,
+                    changeType: 'missing',
+                    severity: 'warning',
+                    label: 'Facture introuvable pour prestation',
+                    differences: [[
+                        'field' => 'facture',
+                        'label' => 'Facture',
+                        'old' => null,
+                        'new' => $numero,
+                        'type' => 'missing',
+                    ]],
+                    context: ['numero_facture' => $numero, 'article' => $article],
+                );
                 continue;
             }
 
+            $seenFactureIds[$factureId] = $factureId;
             $rowHash = ImportRowHasher::hash($this->batch->type, $row);
             $existingKey = $factureId.'|'.$article;
-            $existingHash = $existingHashes[$existingKey] ?? null;
+            $existingRow = $existingRows[$existingKey] ?? null;
+            $existingHash = $existingRow ? ($existingRow->row_hash ?? '__EXISTS_NO_HASH__') : null;
 
             if (
                 ! $this->batch->force_import
@@ -128,6 +171,23 @@ class PrestationsImport extends StringValueBinder implements
             $changedRows++;
             $touchedFactureIds[$factureId] = $factureId;
 
+            $recordDiff = $deltaService->diffForRecord(
+                entityType: 'prestation',
+                entityKey: $article,
+                factureId: $factureId,
+                existing: $existingRow,
+                newRecord: $record,
+                columns: self::DIFF_COLUMNS,
+                labels: self::DIFF_LABELS,
+                context: ['numero_facture' => $numero, 'article' => $article],
+            );
+
+            if ($recordDiff) {
+                $diffs[] = $recordDiff;
+            }
+
+            array_push($diffs, ...$deltaService->lineTotalInconsistencies('prestation', $article, $factureId, $record));
+
             $this->localCount++;
         }
 
@@ -150,6 +210,11 @@ class PrestationsImport extends StringValueBinder implements
 
             $this->recordTouchedFactureIds($touchedFactureIds);
         }
+
+        $deltaService->record($this->batch, [...array_values($missingDiffs), ...$diffs]);
+        $diffFactureIds = collect($diffs)->pluck('facture_id')->filter()->map(fn ($id) => (int) $id)->unique()->all();
+        $resolvedIds = array_values(array_diff(array_values($seenFactureIds), $diffFactureIds));
+        $deltaService->clearResolvedFactures($this->batch, $resolvedIds, 'prestation');
 
         $processedRows = $changedRows + $unchangedRows + $missingRows;
         Cache::increment("import_batch_{$this->batch->id}", $processedRows);

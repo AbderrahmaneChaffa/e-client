@@ -15,6 +15,7 @@ class FactureController extends Controller
     {
         $query = Facture::with(['client', 'escale.navire']);
         $hasVerificationColumns = Schema::hasColumn('factures', 'verification_status');
+        $hasImportDiffColumns = Schema::hasColumn('factures', 'import_diff_status');
 
         // ── Filtres ──────────────────────────────────────────────────────────
         if ($request->filled('numero') || $request->filled('search')) {
@@ -45,6 +46,17 @@ class FactureController extends Controller
                 'critical' => $query->where('verification_status', 'critical'),
                 'warning' => $query->where('verification_status', 'warning'),
                 'ok' => $query->where('verification_status', 'ok'),
+                default => null,
+            };
+        }
+
+        if ($hasImportDiffColumns && $request->filled('ecart')) {
+            match($request->ecart) {
+                'any' => $query->whereNotNull('import_diff_status'),
+                'new' => $query->where('import_diff_status', 'new'),
+                'modified' => $query->where('import_diff_status', 'modified'),
+                'missing' => $query->where('import_diff_status', 'missing'),
+                'inconsistent' => $query->where('import_diff_status', 'inconsistent'),
                 default => null,
             };
         }
@@ -120,6 +132,16 @@ class FactureController extends Controller
                 default => null,
             };
         }
+        if ($hasImportDiffColumns && $request->filled('ecart')) {
+            match($request->ecart) {
+                'any' => $statsQuery->whereNotNull('import_diff_status'),
+                'new' => $statsQuery->where('import_diff_status', 'new'),
+                'modified' => $statsQuery->where('import_diff_status', 'modified'),
+                'missing' => $statsQuery->where('import_diff_status', 'missing'),
+                'inconsistent' => $statsQuery->where('import_diff_status', 'inconsistent'),
+                default => null,
+            };
+        }
         if ($request->filled('date_from')) {
             $statsQuery->whereDate('date_facture', '>=', $request->date_from);
         }
@@ -161,6 +183,7 @@ class FactureController extends Controller
             'count_annulees' => (int) ($statusStats->count_annulees ?? 0),
             'count_anomalies' => $hasVerificationColumns ? (clone $statsQuery)->whereIn('verification_status', ['warning', 'critical'])->count() : 0,
             'count_critical' => $hasVerificationColumns ? (clone $statsQuery)->where('verification_status', 'critical')->count() : 0,
+            'count_ecarts' => $hasImportDiffColumns ? (clone $statsQuery)->whereNotNull('import_diff_status')->count() : 0,
         ];
 
         $clients = Client::select('id', 'name')->orderBy('name')->get();
@@ -195,6 +218,10 @@ class FactureController extends Controller
     public function show(Facture $facture)
     {
         $facture->load(['client', 'escale.navire', 'prestations', 'paiements']);
-        return view('admins.factures.show', compact('facture'));
+        $importDiffs = Schema::hasTable('import_diffs')
+            ? $facture->importDiffs()->with('importBatch')->latest('id')->limit(20)->get()
+            : collect();
+
+        return view('admins.factures.show', compact('facture', 'importDiffs'));
     }
 }

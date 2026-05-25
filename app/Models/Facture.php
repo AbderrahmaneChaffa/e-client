@@ -38,6 +38,12 @@ class Facture extends Model
         'verification_status',
         'verification_flags',
         'last_verified_at',
+        'import_diff_status',
+        'last_import_diff_type',
+        'import_diff_count',
+        'import_diff_summary',
+        'last_import_batch_id',
+        'last_import_diff_at',
     ];
 
     // Dates automatiques
@@ -49,6 +55,8 @@ class Facture extends Model
         'needs_review' => 'boolean',
         'verification_flags' => 'array',
         'last_verified_at' => 'datetime',
+        'import_diff_summary' => 'array',
+        'last_import_diff_at' => 'datetime',
     ];
 
     // Filtre pour les factures impayées (Utilisé pour l'affichage client)
@@ -95,6 +103,11 @@ class Facture extends Model
     public function paiements(): HasMany
     {
         return $this->hasMany(Paiement::class);
+    }
+
+    public function importDiffs(): HasMany
+    {
+        return $this->hasMany(ImportDiff::class);
     }
 
     // public function navire(): BelongsTo

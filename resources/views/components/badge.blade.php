@@ -18,6 +18,10 @@
         'warning' => ['label' => 'A verifier', 'class' => 'bg-warning-50 text-warning-700 ring-warning-600/20 dark:bg-warning-900/30 dark:text-warning-300', 'icon' => 'triangle-alert'],
         'critical' => ['label' => 'Critique', 'class' => 'bg-danger-50 text-danger-700 ring-danger-600/20 dark:bg-danger-900/30 dark:text-danger-300', 'icon' => 'octagon-alert'],
         'ok' => ['label' => 'OK', 'class' => 'bg-success-50 text-success-700 ring-success-600/20 dark:bg-success-900/30 dark:text-success-300', 'icon' => 'shield-check'],
+        'new' => ['label' => 'Nouveau', 'class' => 'bg-info-50 text-info-700 ring-info-600/20 dark:bg-info-900/30 dark:text-info-300', 'icon' => 'plus-circle'],
+        'modified' => ['label' => 'Modifie', 'class' => 'bg-warning-50 text-warning-700 ring-warning-600/20 dark:bg-warning-900/30 dark:text-warning-300', 'icon' => 'pencil'],
+        'missing' => ['label' => 'Manquant', 'class' => 'bg-danger-50 text-danger-700 ring-danger-600/20 dark:bg-danger-900/30 dark:text-danger-300', 'icon' => 'circle-off'],
+        'inconsistent' => ['label' => 'Incoherent', 'class' => 'bg-danger-50 text-danger-700 ring-danger-600/20 dark:bg-danger-900/30 dark:text-danger-300', 'icon' => 'octagon-alert'],
         'admin' => ['label' => 'Admin', 'class' => 'bg-primary-50 text-primary-700 ring-primary-600/20 dark:bg-primary-900/30 dark:text-primary-300', 'icon' => 'shield'],
         'client' => ['label' => 'Client', 'class' => 'bg-slate-100 text-slate-700 ring-slate-500/20 dark:bg-slate-700 dark:text-slate-200', 'icon' => 'user'],
     ];

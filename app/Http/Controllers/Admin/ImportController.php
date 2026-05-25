@@ -9,6 +9,7 @@ use App\Models\ImportBatch;
 use App\Services\ExcelTypeDetector;
 use App\Services\ImportPreviewService;
 use App\Services\ImportVerificationService;
+use App\Services\Notifications\AlertNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\{Auth, Bus, Cache, Log, Schema, Storage};
@@ -156,6 +157,8 @@ class ImportController extends Controller
 
             $batchIds[$type] = $batch->id;
             $jobs[] = new ProcessImportJob($batch->id);
+
+            app(AlertNotificationService::class)->notifyQueuedImport($batch);
         }
 
         if ($jobs !== []) {
@@ -176,6 +179,20 @@ class ImportController extends Controller
     public function progress(ImportBatch $batch): JsonResponse
     {
         return response()->json($this->progressPayload($batch->fresh()));
+    }
+
+    public function show(ImportBatch $batch): View
+    {
+        $batch->load('creator');
+        $progress = $this->progressPayload($batch);
+        $diffs = Schema::hasTable('import_diffs')
+            ? $batch->diffs()->with('facture.client')->latest('id')->limit(100)->get()
+            : collect();
+        $verifications = Schema::hasTable('import_verifications')
+            ? $batch->verifications()->latest('id')->get()
+            : collect();
+
+        return view('admins.imports.show', compact('batch', 'progress', 'diffs', 'verifications'));
     }
 
     public function progressMany(Request $request): JsonResponse
@@ -237,6 +254,8 @@ class ImportController extends Controller
             'type' => $batch->type,
             'sync_mode' => data_get($batch->metadata, 'sync_mode'),
             'skipped_duplicate_of' => data_get($batch->metadata, 'skipped_duplicate_of'),
+            'import_diffs' => data_get($batch->metadata, 'import_diffs', []),
+            'missing_existing_factures' => data_get($batch->metadata, 'missing_existing_factures', 0),
             'verification' => Cache::get("import_verification_{$batch->id}", ['status' => 'pending']),
         ];
     }
@@ -317,6 +336,8 @@ class ImportController extends Controller
             new VerifyImportJob($batch->id, [$batch->id]),
         ])->onQueue('imports')->dispatch();
 
+        app(AlertNotificationService::class)->notifyQueuedImport($batch);
+
         return response()->json(['message' => 'Reprise de l import lancee.', 'batch_id' => $batch->id]);
     }
 
@@ -353,6 +374,7 @@ class ImportController extends Controller
 
         try {
             VerifyImportJob::dispatch(null, [])->onQueue('imports');
+            app(AlertNotificationService::class)->notifyGlobalVerificationQueued();
         } catch (\Throwable $e) {
             Cache::forget(VerifyImportJob::GLOBAL_LOCK_CACHE_KEY);
             Cache::put(VerifyImportJob::GLOBAL_STATUS_CACHE_KEY, [

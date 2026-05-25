@@ -7,6 +7,7 @@ use App\Imports\Concerns\ResolvesInvoiceImportRelations;
 use App\Imports\Concerns\TracksImportTouchedFactures;
 use App\Models\Facture;
 use App\Models\ImportBatch;
+use App\Services\ImportDeltaService;
 use App\Services\ImportRowHasher;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -42,12 +43,47 @@ class FacturesPayeesImport extends StringValueBinder implements
     private int $updatedCount = 0;
     private int $skippedCount = 0;
 
+    private const DIFF_COLUMNS = [
+        'client_id',
+        'escale_id',
+        'date_facture',
+        'bordereau',
+        'description',
+        'pour',
+        'total_ht',
+        'total_tva',
+        'total_ttc',
+        'reste_a_payer',
+        'devise',
+        'taux_devise',
+        'mode_paiement',
+        'annuler',
+    ];
+
+    private const DIFF_LABELS = [
+        'client_id' => 'Client',
+        'escale_id' => 'Escale',
+        'date_facture' => 'Date facture',
+        'bordereau' => 'Bordereau',
+        'description' => 'Description',
+        'pour' => 'Pour',
+        'total_ht' => 'Total HT',
+        'total_tva' => 'TVA',
+        'total_ttc' => 'Total TTC',
+        'reste_a_payer' => 'Reste a payer',
+        'devise' => 'Devise',
+        'taux_devise' => 'Taux devise',
+        'mode_paiement' => 'Mode paiement',
+        'annuler' => 'Annulation',
+    ];
+
     public function __construct(private readonly ImportBatch $batch)
     {
     }
 
     public function collection(Collection $rows): void
     {
+        $deltaService = app(ImportDeltaService::class);
         $now = now()->toDateTimeString();
         $userId = $this->batch->created_by;
 
@@ -59,7 +95,25 @@ class FacturesPayeesImport extends StringValueBinder implements
             ->all();
 
         $existingFactures = Facture::whereIn('numero_facture', $numeros)
-            ->get(['numero_facture', 'row_hash', 'annuler'])
+            ->get([
+                'id',
+                'numero_facture',
+                'client_id',
+                'escale_id',
+                'date_facture',
+                'bordereau',
+                'description',
+                'pour',
+                'total_ht',
+                'total_tva',
+                'total_ttc',
+                'reste_a_payer',
+                'devise',
+                'taux_devise',
+                'mode_paiement',
+                'annuler',
+                'row_hash',
+            ])
             ->keyBy('numero_facture');
 
         $existingHashes = $existingFactures
@@ -70,6 +124,8 @@ class FacturesPayeesImport extends StringValueBinder implements
 
         $records = [];
         $changedNumeros = [];
+        $seenNumeros = [];
+        $diffs = [];
         $createdRows = 0;
         $updatedRows = 0;
         $unchangedRows = 0;
@@ -81,8 +137,10 @@ class FacturesPayeesImport extends StringValueBinder implements
                 continue;
             }
 
+            $seenNumeros[$numero] = true;
             $rowHash = ImportRowHasher::hash($this->batch->type, $row);
             $existingHash = $existingHashes[$numero] ?? null;
+            $existingFacture = $existingFactures->get($numero);
 
             if (
                 ! $this->batch->force_import
@@ -100,9 +158,9 @@ class FacturesPayeesImport extends StringValueBinder implements
             $changedNumeros[$numero] = true;
             $annuler = $this->hasCellHeading($row, 'annule')
                 ? $this->parseBooleanFlag($this->cellValue($row, 'annule', '0'))
-                : (bool) ($existingFactures->get($numero)?->annuler ?? false);
+                : (bool) ($existingFacture?->annuler ?? false);
 
-            $records[] = [
+            $record = [
                 'numero_facture' => $numero,
                 'client_id' => $this->clientIdForInvoiceImportRow($row),
                 'escale_id' => $this->escaleIdForInvoiceImportRow($row),
@@ -124,6 +182,23 @@ class FacturesPayeesImport extends StringValueBinder implements
                 'updated_at' => $now,
             ];
 
+            $recordDiff = $deltaService->diffForRecord(
+                entityType: 'facture',
+                entityKey: $numero,
+                factureId: $existingFacture?->id,
+                existing: $existingFacture,
+                newRecord: $record,
+                columns: self::DIFF_COLUMNS,
+                labels: self::DIFF_LABELS,
+                context: ['numero_facture' => $numero],
+            );
+
+            if ($recordDiff) {
+                $diffs[] = $recordDiff;
+            }
+
+            array_push($diffs, ...$deltaService->factureInconsistencies($numero, $existingFacture?->id, $record));
+            $records[] = $record;
             $this->localCount++;
         }
 
@@ -150,10 +225,21 @@ class FacturesPayeesImport extends StringValueBinder implements
                     'updated_at',
                 ]
             );
+        }
 
-            $this->recordTouchedFactureIds(
-                Facture::whereIn('numero_facture', array_keys($changedNumeros))->pluck('id')->all()
-            );
+        if ($seenNumeros !== []) {
+            $factureIdsByNumero = Facture::whereIn('numero_facture', array_keys($seenNumeros))
+                ->pluck('id', 'numero_facture')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
+            $this->recordTouchedFactureIds(array_values($factureIdsByNumero));
+
+            $diffs = $deltaService->attachFactureIds($diffs, $factureIdsByNumero);
+            $deltaService->record($this->batch, $diffs);
+            $diffFactureIds = collect($diffs)->pluck('facture_id')->filter()->map(fn ($id) => (int) $id)->unique()->all();
+            $resolvedIds = array_values(array_diff(array_values($factureIdsByNumero), $diffFactureIds));
+            $deltaService->clearResolvedFactures($this->batch, $resolvedIds, 'facture');
         }
 
         $count = count($records) + $unchangedRows;

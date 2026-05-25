@@ -206,6 +206,7 @@
                                 <td class="px-4 py-4 text-sm">{{ optional($batch->created_at)->format('d/m/Y H:i') }}</td>
                                 <td class="px-4 py-4">
                                     <div class="flex justify-end gap-2">
+                                        <a href="{{ route('admin.imports.show', $batch) }}" class="ui-icon-btn" aria-label="Voir details"><i data-lucide="eye" class="h-4 w-4"></i></a>
                                         @if($batch->status !== 'processing')
                                             <button type="button" class="ui-icon-btn" @click="resume({{ $batch->id }})" aria-label="Relancer l'import"><i data-lucide="refresh-cw" class="h-4 w-4"></i></button>
                                         @endif

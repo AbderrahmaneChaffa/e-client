@@ -10,7 +10,7 @@
 
 @section('content')
 @php
-    $activeFilters = collect(['search', 'numero', 'client_id', 'statut', 'verification', 'date_from', 'date_to', 'period', 'amount_min', 'amount_max', 'per_page'])->filter(fn ($key) => request()->filled($key))->count();
+    $activeFilters = collect(['search', 'numero', 'client_id', 'statut', 'verification', 'ecart', 'date_from', 'date_to', 'period', 'amount_min', 'amount_max', 'per_page'])->filter(fn ($key) => request()->filled($key))->count();
 @endphp
 
 <div x-data="{ state: 'data', filtering: false, advanced: false }" class="space-y-6">
@@ -32,11 +32,12 @@
     </div>
 
     <div class="space-y-6 transition-all duration-300">
-        <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
             <x-stat-card title="Total TTC" :value="number_format($stats['total_ttc'] ?? 0, 0, ',', ' ').' DA'" icon="receipt-text" color="info" />
             <x-stat-card title="Reste a payer" :value="number_format($stats['reste_total'] ?? 0, 0, ',', ' ').' DA'" icon="badge-alert" color="danger" />
             <x-stat-card title="Factures payees" :value="number_format($stats['count_payees'] ?? 0, 0, ',', ' ')" icon="check-circle-2" color="success" />
             <x-stat-card title="Anomalies" :value="number_format($stats['count_anomalies'] ?? 0, 0, ',', ' ')" icon="triangle-alert" color="warning" />
+            <x-stat-card title="Ecarts import" :value="number_format($stats['count_ecarts'] ?? 0, 0, ',', ' ')" icon="git-compare-arrows" color="danger" />
         </section>
 
         <form method="GET" action="{{ route('admin.factures.index') }}" class="ui-card p-4" @submit="filtering = true">
@@ -94,6 +95,17 @@
                             <option value="critical" @selected(request('verification') === 'critical')>Critique</option>
                             <option value="warning" @selected(request('verification') === 'warning')>Avertissement</option>
                             <option value="ok" @selected(request('verification') === 'ok')>OK</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="ui-label mb-1" for="ecart">Ecarts import</label>
+                        <select id="ecart" name="ecart" class="ui-input">
+                            <option value="">Tous</option>
+                            <option value="any" @selected(request('ecart') === 'any')>Avec ecart</option>
+                            <option value="new" @selected(request('ecart') === 'new')>Nouveaux</option>
+                            <option value="modified" @selected(request('ecart') === 'modified')>Modifies</option>
+                            <option value="missing" @selected(request('ecart') === 'missing')>Manquants</option>
+                            <option value="inconsistent" @selected(request('ecart') === 'inconsistent')>Incoherents</option>
                         </select>
                     </div>
                     <div>
@@ -164,6 +176,7 @@
                                 <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">Client</th>
                                 <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">Navire / escale</th>
                                 <th scope="col" class="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">Montant</th>
+                                <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">Ecarts</th>
                                 <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">Statut</th>
                                 <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">Date</th>
                                 <th scope="col" class="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">Actions</th>
@@ -197,6 +210,20 @@
                                         <p class="font-semibold tabular-nums">{{ number_format($facture->total_ttc, 2, ',', ' ') }} DA</p>
                                         <p class="text-xs text-gray-500 dark:text-gray-400">Reste {{ number_format($facture->reste_a_payer, 2, ',', ' ') }} DA</p>
                                     </td>
+                                    <td class="px-4 py-4">
+                                        @if($facture->import_diff_status)
+                                            <div class="space-y-1">
+                                                <x-badge :status="$facture->import_diff_status" :label="($facture->import_diff_count ?? 1).' ecart(s)'" />
+                                                @if(($facture->import_diff_summary ?? []) !== [])
+                                                    <p class="max-w-[14rem] truncate text-xs text-gray-500 dark:text-gray-400">
+                                                        {{ collect($facture->import_diff_summary)->pluck('label')->filter()->take(2)->implode(' / ') }}
+                                                    </p>
+                                                @endif
+                                            </div>
+                                        @else
+                                            <span class="text-sm text-gray-400">-</span>
+                                        @endif
+                                    </td>
                                     <td class="px-4 py-4"><x-badge :status="$status" /></td>
                                     <td class="px-4 py-4 text-sm text-gray-700 dark:text-gray-300">{{ optional($facture->date_facture)->format('d/m/Y') }}</td>
                                     <td class="px-4 py-4">
@@ -226,6 +253,11 @@
                                 </div>
                                 <x-badge :status="$status" />
                             </div>
+                            @if($facture->import_diff_status)
+                                <div class="mt-3">
+                                    <x-badge :status="$facture->import_diff_status" :label="($facture->import_diff_count ?? 1).' ecart(s)'" />
+                                </div>
+                            @endif
                             <div class="mt-4 grid grid-cols-2 gap-3 text-sm">
                                 <div><span class="text-gray-500 dark:text-gray-400">Montant</span><p class="font-semibold">{{ number_format($facture->total_ttc, 0, ',', ' ') }} DA</p></div>
                                 <div><span class="text-gray-500 dark:text-gray-400">Date</span><p class="font-semibold">{{ optional($facture->date_facture)->format('d/m/Y') }}</p></div>

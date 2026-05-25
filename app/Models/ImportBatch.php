@@ -5,6 +5,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ImportBatch extends Model
 {
@@ -44,6 +45,11 @@ class ImportBatch extends Model
     public function verifications()
     {
         return $this->hasMany(ImportVerification::class);
+    }
+
+    public function diffs(): HasMany
+    {
+        return $this->hasMany(ImportDiff::class);
     }
 
     public function getProgressPercentageAttribute(): int

@@ -11,6 +11,7 @@ use App\Models\Client;
 use App\Models\Facture;
 use App\Models\ImportBatch;
 use App\Models\User;
+use App\Services\ImportDeltaService;
 use App\Services\ImportVerificationService;
 use App\UserRole;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -50,6 +51,52 @@ class ImportOptimizationTest extends TestCase
         $this->assertDatabaseCount('factures', 1);
         $this->assertSame(0, (int) $secondBatch->fresh()->created_rows);
         $this->assertSame(1, (int) $secondBatch->fresh()->skipped_rows);
+    }
+
+    public function test_factures_import_records_and_clears_invoice_differences(): void
+    {
+        $client = Client::factory()->create(['code_client' => 'CLT-OPT']);
+        $this->createFacture($client->id, 'FAC-OPT-1', 1000, 190, 1190);
+        $row = $this->factureRow();
+
+        (new FacturesImport($this->batch('factures')))->collection(new Collection([$row]));
+
+        $facture = Facture::where('numero_facture', 'FAC-OPT-1')->firstOrFail();
+
+        $this->assertSame('modified', $facture->import_diff_status);
+        $this->assertSame(1, (int) $facture->import_diff_count);
+        $this->assertDatabaseHas('import_diffs', [
+            'facture_id' => $facture->id,
+            'entity_type' => 'facture',
+            'change_type' => 'modified',
+        ]);
+
+        (new FacturesImport($this->batch('factures')))->collection(new Collection([$row]));
+
+        $facture->refresh();
+
+        $this->assertNull($facture->import_diff_status);
+        $this->assertSame(0, (int) $facture->import_diff_count);
+    }
+
+    public function test_import_diff_summary_refresh_never_creates_partial_factures(): void
+    {
+        $service = app(ImportDeltaService::class);
+        $method = new \ReflectionMethod($service, 'updateExistingFactureSummaries');
+        $method->setAccessible(true);
+
+        $method->invoke($service, [[
+            'id' => 999999,
+            'import_diff_status' => 'inconsistent',
+            'last_import_diff_type' => 'facture',
+            'import_diff_count' => 1,
+            'import_diff_summary' => '[{"label":"Total facture incoherent"}]',
+            'last_import_batch_id' => 123,
+            'last_import_diff_at' => now(),
+            'updated_at' => now(),
+        ]]);
+
+        $this->assertDatabaseMissing('factures', ['id' => 999999]);
     }
 
     public function test_prestations_import_upserts_existing_business_key_without_duplicate(): void

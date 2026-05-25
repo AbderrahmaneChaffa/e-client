@@ -164,6 +164,135 @@ window.appShell = function appShell() {
     };
 };
 
+window.notificationCenter = function notificationCenter(config) {
+    return {
+        open: false,
+        loading: false,
+        markingAll: false,
+        notifications: config.initialNotifications || [],
+        unreadCount: Number(config.initialUnreadCount || 0),
+        poller: null,
+        pollInterval: Number(config.pollInterval || 6000),
+
+        get displayCount() {
+            return this.unreadCount > 99 ? '99+' : String(this.unreadCount);
+        },
+
+        get unreadCountLabel() {
+            if (this.unreadCount === 0) {
+                return 'Tout est lu';
+            }
+
+            return `${this.unreadCount} non lue${this.unreadCount > 1 ? 's' : ''}`;
+        },
+
+        init() {
+            this.fetchFeed(false);
+            this.poller = setInterval(() => {
+                if (!document.hidden) {
+                    this.fetchFeed(false);
+                }
+            }, this.pollInterval);
+
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden) {
+                    this.fetchFeed(false);
+                }
+            });
+
+            window.addEventListener('focus', () => this.fetchFeed(false));
+            this.$nextTick(() => window.refreshLucideIcons());
+        },
+
+        toggle() {
+            this.open = !this.open;
+
+            if (this.open) {
+                this.fetchFeed(true);
+            }
+        },
+
+        async fetchFeed(showLoading = false) {
+            if (!config.feedUrl) {
+                return;
+            }
+
+            this.loading = showLoading;
+
+            try {
+                const response = await window.axios.get(config.feedUrl, {
+                    params: { limit: 12, _: Date.now() },
+                    headers: { Accept: 'application/json' },
+                });
+
+                this.notifications = response.data.notifications || [];
+                this.unreadCount = Number(response.data.unread_count || 0);
+            } finally {
+                this.loading = false;
+                this.$nextTick(() => window.refreshLucideIcons());
+            }
+        },
+
+        openNotification(notification) {
+            if (!notification.is_read && this.unreadCount > 0) {
+                notification.is_read = true;
+                this.unreadCount -= 1;
+            }
+
+            window.location.href = notification.open_url || notification.url || config.historyUrl;
+        },
+
+        async markAllAsRead() {
+            if (this.unreadCount === 0 || this.markingAll) {
+                return;
+            }
+
+            this.markingAll = true;
+
+            try {
+                const response = await window.axios.patch(config.markAllReadUrl, {}, {
+                    headers: { Accept: 'application/json' },
+                });
+
+                this.unreadCount = Number(response.data.unread_count || 0);
+                this.notifications = this.notifications.map((notification) => ({
+                    ...notification,
+                    is_read: true,
+                    read_at: notification.read_at || new Date().toISOString(),
+                }));
+            } finally {
+                this.markingAll = false;
+            }
+        },
+
+        iconClass(notification) {
+            const color = notification.color || notification.severity || 'info';
+            const classes = {
+                success: 'bg-success-100 text-success-700 dark:bg-success-900/40 dark:text-success-200',
+                warning: 'bg-warning-100 text-warning-700 dark:bg-warning-900/40 dark:text-warning-200',
+                danger: 'bg-danger-100 text-danger-700 dark:bg-danger-900/40 dark:text-danger-200',
+                critical: 'bg-danger-100 text-danger-700 dark:bg-danger-900/40 dark:text-danger-200',
+                info: 'bg-info-100 text-info-700 dark:bg-info-900/40 dark:text-info-200',
+            };
+
+            return classes[color] || classes.info;
+        },
+
+        badgeClass(notification) {
+            const color = notification.color || notification.severity || 'info';
+            const classes = {
+                success: 'bg-success-100 text-success-700 dark:bg-success-900/40 dark:text-success-200',
+                warning: 'bg-warning-100 text-warning-700 dark:bg-warning-900/40 dark:text-warning-200',
+                danger: 'bg-danger-100 text-danger-700 dark:bg-danger-900/40 dark:text-danger-200',
+                critical: 'bg-danger-100 text-danger-700 dark:bg-danger-900/40 dark:text-danger-200',
+                info: 'bg-info-100 text-info-700 dark:bg-info-900/40 dark:text-info-200',
+            };
+
+            return classes[color] || classes.info;
+        },
+    };
+};
+
 Alpine.start();
 
 document.addEventListener('DOMContentLoaded', () => window.refreshLucideIcons());

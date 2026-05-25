@@ -36,6 +36,18 @@ trait LoadsExistingImportState
      */
     private function existingHashesForFacturePairs(string $table, string $keyColumn, array $pairs): array
     {
+        return collect($this->existingRowsForFacturePairs($table, $keyColumn, $pairs))
+            ->map(fn ($row) => $row->row_hash ?? '__EXISTS_NO_HASH__')
+            ->all();
+    }
+
+    /**
+     * @param array<int,array{facture_id:int|string|null, key:string|null}> $pairs
+     * @param array<int,string> $columns
+     * @return array<string,object>
+     */
+    private function existingRowsForFacturePairs(string $table, string $keyColumn, array $pairs, array $columns = []): array
+    {
         if (! in_array($table, ['prestations', 'paiements'], true)
             || ! in_array($keyColumn, ['article', 'recu'], true)) {
             throw new \InvalidArgumentException('Import hash lookup cible invalide.');
@@ -61,18 +73,21 @@ trait LoadsExistingImportState
             return [];
         }
 
+        $columns = $this->safeImportStateColumns($table, $keyColumn, $columns);
+
         return DB::connection()->getDriverName() === 'mysql'
-            ? $this->existingHashesForMysqlPairs($table, $keyColumn, array_values($requested))
-            : $this->existingHashesForPortablePairs($table, $keyColumn, $requested);
+            ? $this->existingRowsForMysqlPairs($table, $keyColumn, array_values($requested), $columns)
+            : $this->existingRowsForPortablePairs($table, $keyColumn, $requested, $columns);
     }
 
     /**
      * @param array<int,array{facture_id:int,key:string}> $pairs
-     * @return array<string,string>
+     * @param array<int,string> $columns
+     * @return array<string,object>
      */
-    private function existingHashesForMysqlPairs(string $table, string $keyColumn, array $pairs): array
+    private function existingRowsForMysqlPairs(string $table, string $keyColumn, array $pairs, array $columns): array
     {
-        $hashes = [];
+        $rows = [];
 
         foreach (array_chunk($pairs, 500) as $chunk) {
             $bindings = [];
@@ -86,39 +101,79 @@ trait LoadsExistingImportState
 
             DB::table($table)
                 ->whereRaw('(facture_id, '.$keyColumn.') IN ('.implode(', ', $placeholders).')', $bindings)
-                ->select('facture_id', $keyColumn, 'row_hash')
+                ->select($columns)
                 ->get()
-                ->each(function ($row) use (&$hashes, $keyColumn) {
-                    $hashes[$row->facture_id.'|'.$row->{$keyColumn}] = $row->row_hash ?? '__EXISTS_NO_HASH__';
+                ->each(function ($row) use (&$rows, $keyColumn) {
+                    $rows[$row->facture_id.'|'.$row->{$keyColumn}] = $row;
                 });
         }
 
-        return $hashes;
+        return $rows;
     }
 
     /**
      * @param array<string,array{facture_id:int,key:string}> $requested
-     * @return array<string,string>
+     * @param array<int,string> $columns
+     * @return array<string,object>
      */
-    private function existingHashesForPortablePairs(string $table, string $keyColumn, array $requested): array
+    private function existingRowsForPortablePairs(string $table, string $keyColumn, array $requested, array $columns): array
     {
         $factureIds = array_values(array_unique(array_column($requested, 'facture_id')));
         $keys = array_values(array_unique(array_column($requested, 'key')));
-        $hashes = [];
+        $rows = [];
 
         DB::table($table)
             ->whereIn('facture_id', $factureIds)
             ->whereIn($keyColumn, $keys)
-            ->select('facture_id', $keyColumn, 'row_hash')
+            ->select($columns)
             ->get()
-            ->each(function ($row) use (&$hashes, $requested, $keyColumn) {
+            ->each(function ($row) use (&$rows, $requested, $keyColumn) {
                 $compound = $row->facture_id.'|'.$row->{$keyColumn};
 
                 if (isset($requested[$compound])) {
-                    $hashes[$compound] = $row->row_hash ?? '__EXISTS_NO_HASH__';
+                    $rows[$compound] = $row;
                 }
             });
 
-        return $hashes;
+        return $rows;
+    }
+
+    /**
+     * @param array<int,string> $columns
+     * @return array<int,string>
+     */
+    private function safeImportStateColumns(string $table, string $keyColumn, array $columns): array
+    {
+        $allowed = [
+            'prestations' => [
+                'facture_id',
+                'article',
+                'libelle',
+                'quantite',
+                'prix_unitaire',
+                'taux_ht',
+                'total_ht',
+                'total_tva',
+                'total_ttc',
+                'row_hash',
+            ],
+            'paiements' => [
+                'facture_id',
+                'recu',
+                'montant',
+                'date_paiement',
+                'numero_cheque',
+                'banque',
+                'facture_anterieur',
+                'row_hash',
+            ],
+        ];
+
+        return array_values(array_unique(array_filter([
+            'facture_id',
+            $keyColumn,
+            'row_hash',
+            ...$columns,
+        ], fn ($column) => in_array($column, $allowed[$table] ?? [], true))));
     }
 }
