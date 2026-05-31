@@ -61,10 +61,10 @@
             <div class="h-px flex-1 bg-gray-200 dark:bg-gray-700"></div>
         </div>
 
-        <button type="button" class="ui-btn-secondary w-full" disabled>
+        {{-- <button type="button" class="ui-btn-secondary w-full" disabled>
             <i data-lucide="chrome" class="h-4 w-4" aria-hidden="true"></i>
             Connexion Google indisponible
-        </button>
+        </button> --}}
 
         <p class="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
             Pas encore de compte ?

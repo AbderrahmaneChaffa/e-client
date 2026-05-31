@@ -42,13 +42,13 @@
                             <p class="text-sm text-gray-600 dark:text-gray-400">Portail facture et paiement</p>
                         </div>
                     </div>
-                    <div class="rounded-lg border border-white/50 bg-white/60 p-8 shadow-soft backdrop-blur dark:border-gray-800 dark:bg-gray-900/60">
+                    {{-- <div class="rounded-lg border border-white/50 bg-white/60 p-8 shadow-soft backdrop-blur dark:border-gray-800 dark:bg-gray-900/60">
                         <i data-lucide="ship" class="mb-6 h-12 w-12 text-primary-600 dark:text-primary-300" aria-hidden="true"></i>
                         <h1 class="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Gestion fluide des factures portuaires.</h1>
                         <p class="mt-4 text-sm leading-6 text-gray-600 dark:text-gray-400">
                             Suivez vos factures, paiements et imports ERP BIG dans une interface claire, rapide et securisee.
                         </p>
-                    </div>
+                    </div> --}}
                 </div>
             </section>
 
