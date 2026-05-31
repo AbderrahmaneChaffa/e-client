@@ -38,6 +38,15 @@
         }
     </script>
     <style>[x-cloak]{display:none!important}</style>
+    <style media="print">
+    @page { margin: 1cm; size: A4 landscape; }
+    body { font-size: 11pt; -webkit-print-color-adjust: exact; }
+    .no-print, .ui-btn, form, .pagination { display: none !important; }
+    .ui-card { box-shadow: none !important; border: 1px solid #ddd !important; }
+    table { width: 100% !important; border-collapse: collapse; }
+    th, td { border: 1px solid #ccc !important; padding: 4px !important; }
+    .bg-primary-50\/30 { background: #f0f9ff !important; }
+</style>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @stack('head')
 </head>

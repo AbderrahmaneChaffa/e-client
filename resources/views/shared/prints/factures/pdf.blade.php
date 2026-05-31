@@ -407,8 +407,8 @@
                 <td class="col-left"></td>
 
                 <td class="col-center">
-                    <div class="facture-title">FACTURE DE PRESTATIONS PORTUAIRES</div>
-                    <div class="facture-number">N° {{ $facture->numero_facture ?? $facture->id }}</div>
+                    <div class="facture-title">FACTURE N° {{ $facture->numero_facture ?? $facture->id }}</div>
+                    {{-- <div class="facture-number">N° {{ $facture->numero_facture ?? $facture->id }}</div> --}}
                 </td>
 
                 <td class="col-right">
@@ -528,7 +528,7 @@
         </div>
 
         <!-- Section Paiement -->
-        <div class="payment-section">
+        {{-- <div class="payment-section">
             <div class="section-title">Conditions de Paiement</div>
             <div class="payment-grid">
                 <div class="payment-col">
@@ -572,7 +572,7 @@
                     </div>
                 </div>
             </div>
-        </div>
+        </div> --}}
 
         <!-- Signatures -->
         <!-- <div class="signatures">

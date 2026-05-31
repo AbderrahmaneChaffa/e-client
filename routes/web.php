@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
-    if (! Auth::check()) {
+    if (!Auth::check()) {
         return redirect()->route('login');
     }
 
@@ -93,6 +93,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         Route::get('/client/paiements', [\App\Http\Controllers\Client\PaiementController::class, 'index'])
             ->name('client.paiements.index');
+        // 🆕 Routes d'export
+        Route::get('/client/paiements/export/excel', [\App\Http\Controllers\Client\PaiementController::class, 'exportExcel'])
+            ->name('client.paiements.export.excel');
+        Route::get('/client/paiements/export/pdf', [\App\Http\Controllers\Client\PaiementController::class, 'exportPdf'])
+            ->name('client.paiements.export.pdf');
+        Route::get('/client/paiements/print', [\App\Http\Controllers\Client\PaiementController::class, 'print'])
+            ->name('client.paiements.print');
     });
 });
 
@@ -102,4 +109,4 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
-require __DIR__.'/auth.php';
+require __DIR__ . '/auth.php';
