@@ -23,12 +23,14 @@ class DatabaseSeeder extends Seeder
             'email' => 'admin@e-client.com',
             'password' => bcrypt('password'),
             'role' => 'admin',
+            'is_validated' => true,
         ]);
         $client = User::factory()->create([
             'name' => 'client',
             'email' => 'client@e-client.com',
             'password' => bcrypt('password'),
             'role' => 'client',
+            'is_validated' => true,
         ]);
         $admin = User::where('email', 'admin@e-client.com')->first();
 

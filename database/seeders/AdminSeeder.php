@@ -18,6 +18,7 @@ class AdminSeeder extends Seeder
             'email' => 'admin@e-client.com',
             'password' => bcrypt('password'),
             'role' => 'admin',
+            'is_validated' => true,
         ]);
     }
 }

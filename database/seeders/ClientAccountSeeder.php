@@ -46,6 +46,7 @@ class ClientAccountSeeder extends Seeder
                     'role' => 'client',
                     'client_id' => $client->id,
                     'email_verified_at' => now(),
+                    'is_validated' => true,
                 ]);
 
                 $created++;

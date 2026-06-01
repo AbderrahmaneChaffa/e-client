@@ -5,6 +5,7 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 
 use App\UserRole;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -25,6 +26,7 @@ class User extends Authenticatable
         'password',
         'role',
         'client_id',
+        'is_validated',
     ];
 
     protected $attributes = [
@@ -33,6 +35,7 @@ class User extends Authenticatable
 
     protected $casts = [
         'role' => UserRole::class,
+        'is_validated' => 'boolean',
     ];
     /**
      * The attributes that should be hidden for serialization.
@@ -52,10 +55,18 @@ class User extends Authenticatable
     protected function casts(): array
     {
         return [
+            'role' => UserRole::class,
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_validated' => 'boolean',
         ];
     }
+
+    public function scopeValidated(Builder $query): Builder
+    {
+        return $query->where('is_validated', true);
+    }
+
     public function client()
     {
         return $this->belongsTo(Client::class);

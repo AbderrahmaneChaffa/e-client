@@ -16,6 +16,12 @@ class AuthenticatedSessionController extends Controller
      */
     public function create(): View
     {
+        if (session('account_unvalidated')) {
+            return view('auth.unvalidated', [
+                'message' => session('status'),
+            ]);
+        }
+
         return view('auth.login');
     }
 
@@ -25,6 +31,19 @@ class AuthenticatedSessionController extends Controller
     public function store(LoginRequest $request): RedirectResponse
     {
         $request->authenticate();
+
+        if ($request->user()?->is_validated !== true) {
+            Auth::guard('web')->logout();
+
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            return redirect()->route('login')->with([
+                'account_unvalidated' => true,
+                'status' => "Votre compte n'a pas encore été validé par l'administrateur EPO. Veuillez contacter le support.",
+            ]);
+        }
+
         $request->session()->regenerate();
 
         return redirect()->intended(route('dashboard', absolute: false));

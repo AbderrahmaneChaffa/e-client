@@ -1689,12 +1689,27 @@ Implemented through Laravel Breeze and the `web` session guard.
 Features:
 
 - session-based login;
+- account validation gate through `users.is_validated`;
 - password hashing;
 - password reset tokens;
 - email verification routes;
 - password confirmation route;
 - session regeneration after login;
 - session invalidation and CSRF token regeneration after logout.
+
+After credentials are accepted by Breeze, `AuthenticatedSessionController::store()` checks `Auth::user()->is_validated`. If the value is not strictly `true`, the user is immediately logged out, the session is invalidated, the CSRF token is regenerated, and the login route renders a clear "Compte non validé" page. This prevents unvalidated accounts from reaching any authenticated route.
+
+Local/admin validation example:
+
+```bash
+php artisan tinker
+```
+
+```php
+App\Models\User::find(1)->update(['is_validated' => true]);
+```
+
+Future admin UI work should expose this field instead of relying on Tinker.
 
 ### Login Rate Limiting
 
@@ -1809,31 +1824,53 @@ php artisan db:seed --class=ClientAccountSeeder
 
 ### Start the Application
 
-Terminal 1:
+Recommended unified startup:
 
 ```bash
-php artisan serve
+bash start-dev.sh
 ```
 
-Terminal 2:
-
-```bash
-npm run dev
-```
-
-Terminal 3, required for imports:
-
-```bash
-php artisan queue:work database --queue=imports,default --timeout=7200 --memory=1024 --sleep=1 --tries=1
-```
-
-Windows helper:
+On Windows:
 
 ```bat
-start-worker.bat
+start-dev.bat
 ```
 
-The helper checks Redis/Memurai, clears caches, and starts the database queue worker with `--queue=imports,default`.
+The scripts check for PHP, Composer, Node.js, and npm, install dependencies when `vendor/` or `node_modules/` are missing, clear Laravel caches, and then launch these processes together through `concurrently`:
+
+- `php artisan serve --port=8000`
+- `npm run dev`
+- `php artisan queue:work database --queue=imports,default --timeout=7200 --memory=1024 --tries=1 --sleep=1`
+
+You can also run the same development stack directly through npm:
+
+```bash
+npm run start:all
+```
+
+For a production-style asset build while still running the local Laravel server and queue worker:
+
+```bash
+NODE_ENV=production bash start-dev.sh
+npm run start:all:prod
+```
+
+On Windows CMD:
+
+```bat
+set NODE_ENV=production
+start-dev.bat
+```
+
+`concurrently` forwards Ctrl+C to the child processes, so the Laravel server, Vite/build process, and queue worker stop together. The queue worker must listen to `imports,default`; otherwise import jobs dispatched to the `imports` queue will not be processed.
+
+Manual fallback with separate terminals:
+
+```bash
+php artisan serve --port=8000
+npm run dev
+php artisan queue:work database --queue=imports,default --timeout=7200 --memory=1024 --sleep=1 --tries=1
+```
 
 ### Build Assets
 
@@ -2066,4 +2103,3 @@ Use these notes before making changes:
 - For client-facing routes, always enforce `client_id` ownership checks.
 - For queue behavior, test with `php artisan queue:work database --queue=imports,default`.
 - Treat `.env.example` Reverb/Go worker settings as non-authoritative until matching code/packages are added.
-

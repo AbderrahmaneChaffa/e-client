@@ -42,6 +42,28 @@ class AuthenticationTest extends TestCase
         $this->assertGuest();
     }
 
+    public function test_unvalidated_users_are_logged_out_and_redirected(): void
+    {
+        $user = User::factory()->create([
+            'is_validated' => false,
+        ]);
+
+        $response = $this->post('/login', [
+            'email' => $user->email,
+            'password' => 'password',
+        ]);
+
+        $this->assertGuest();
+        $response->assertRedirect(route('login', absolute: false));
+        $response->assertSessionHas('account_unvalidated', true);
+        $response->assertSessionHas('status', "Votre compte n'a pas encore été validé par l'administrateur EPO. Veuillez contacter le support.");
+
+        $this->get('/login')
+            ->assertOk()
+            ->assertSee('Compte non validé')
+            ->assertSee('administrateur EPO');
+    }
+
     public function test_users_can_logout(): void
     {
         $user = User::factory()->create();

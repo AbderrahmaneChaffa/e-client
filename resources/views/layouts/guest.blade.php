@@ -1,5 +1,5 @@
 @extends('layouts.auth')
 
 @section('content')
-    {{ $slot ?? '' }}
+    @yield('guest-content')
 @endsection

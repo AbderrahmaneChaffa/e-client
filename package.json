@@ -4,7 +4,9 @@
     "type": "module",
     "scripts": {
         "build": "vite build",
-        "dev": "vite"
+        "dev": "vite",
+        "start:all": "node -e \"console.log('E-Client EPO démarré. Serveur: http://127.0.0.1:8000 | Queue: imports,default | Vite: hot reload')\" && concurrently --kill-others-on-fail --names \"serve,vite,queue\" --prefix \"[{name}]\" --prefix-colors \"blue,magenta,yellow\" \"php artisan serve --port=8000\" \"npm run dev\" \"php artisan queue:work database --queue=imports,default --timeout=7200 --memory=1024 --tries=1 --sleep=1\"",
+        "start:all:prod": "node -e \"console.log('E-Client EPO démarré. Serveur: http://127.0.0.1:8000 | Queue: imports,default | Assets: build')\" && concurrently --kill-others-on-fail --names \"serve,build,queue\" --prefix \"[{name}]\" --prefix-colors \"blue,green,yellow\" \"php artisan serve --port=8000\" \"npm run build\" \"php artisan queue:work database --queue=imports,default --timeout=7200 --memory=1024 --tries=1 --sleep=1\""
     },
     "devDependencies": {
         "@tailwindcss/forms": "^0.5.2",
