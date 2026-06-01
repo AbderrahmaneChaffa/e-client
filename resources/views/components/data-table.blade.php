@@ -4,12 +4,14 @@
     'rows' => [],
     'filters' => [],
     'sortable' => true,
-    'emptyTitle' => 'Aucune donnee',
-    'emptyMessage' => 'Modifiez les filtres ou ajoutez un nouvel element.',
+    'emptyTitle' => 'Aucune donnée',
+    'emptyMessage' => 'Modifiez les filtres ou ajoutez un nouvel élément.',
 ])
 
 @php
     $collection = $rows instanceof \Illuminate\Pagination\AbstractPaginator ? $rows->getCollection() : collect($rows);
+    $currentSort = (string) request('sort');
+    $currentDirection = request('direction', request('dir', 'desc')) === 'asc' ? 'asc' : 'desc';
 @endphp
 
 <div {{ $attributes->merge(['class' => 'ui-card overflow-hidden']) }} x-data="{ busy: false }">
@@ -28,8 +30,12 @@
         </div>
 
         @if($collection->isEmpty())
-            <div class="p-4">
-                <x-empty-state icon="inbox" :title="$emptyTitle" :message="$emptyMessage" />
+            <div class="flex flex-col items-center justify-center px-6 py-12 text-center">
+                <div class="mb-5 inline-flex h-16 w-16 items-center justify-center rounded-full bg-primary-50 text-primary-600 dark:bg-primary-900/30 dark:text-primary-300">
+                    <i data-lucide="inbox" class="h-8 w-8" aria-hidden="true"></i>
+                </div>
+                <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">{{ $emptyTitle }}</h3>
+                <p class="mt-2 max-w-md text-sm text-gray-600 dark:text-gray-400">{{ $emptyMessage }}</p>
             </div>
         @else
             <div class="hidden md:block">
@@ -41,11 +47,20 @@
                                     $key = is_array($column) ? ($column['key'] ?? '') : $column;
                                     $label = is_array($column) ? ($column['label'] ?? ucfirst($key)) : ucfirst($column);
                                 @endphp
-                                <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">
+                                @php
+                                    $isActive = $currentSort === $key;
+                                    $nextDirection = $isActive && $currentDirection === 'asc' ? 'desc' : 'asc';
+                                    $query = request()->except(['page', 'dir']);
+                                    $query['sort'] = $key;
+                                    $query['direction'] = $nextDirection;
+                                    $sortUrl = url()->current().'?'.http_build_query($query);
+                                    $ariaSort = $isActive ? ($currentDirection === 'asc' ? 'ascending' : 'descending') : 'none';
+                                @endphp
+                                <th scope="col" aria-sort="{{ $sortable && $key ? $ariaSort : 'none' }}" class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">
                                     @if($sortable && $key)
-                                        <a href="{{ request()->fullUrlWithQuery(['sort' => $key, 'dir' => request('dir') === 'asc' ? 'desc' : 'asc']) }}" class="inline-flex items-center gap-1 hover:text-primary-600 dark:hover:text-primary-300">
+                                        <a href="{{ $sortUrl }}" class="inline-flex items-center gap-1 {{ $isActive ? 'text-primary-700 dark:text-primary-300' : 'hover:text-primary-600 dark:hover:text-primary-300' }}">
                                             {{ $label }}
-                                            <i data-lucide="{{ request('sort') === $key ? (request('dir') === 'asc' ? 'arrow-up' : 'arrow-down') : 'arrow-up-down' }}" class="h-3.5 w-3.5" aria-hidden="true"></i>
+                                            <i data-lucide="{{ $isActive ? ($currentDirection === 'asc' ? 'arrow-up' : 'arrow-down') : 'arrow-up-down' }}" class="h-3.5 w-3.5" aria-hidden="true"></i>
                                         </a>
                                     @else
                                         {{ $label }}

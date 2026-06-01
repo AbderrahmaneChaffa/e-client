@@ -3,6 +3,9 @@
 use App\Http\Controllers\Admin\ClientController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\ImportController;
+use App\Http\Controllers\Client\DashboardController as ClientDashboardController;
+use App\Http\Controllers\Client\FactureController as ClientFactureController;
+use App\Http\Controllers\Client\PaiementController as ClientPaiementController;
 use App\Http\Controllers\FactureController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PaiementController;
@@ -81,24 +84,27 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     Route::middleware('role:client')->group(function () {
-        Route::get('/client/dashboard', [\App\Http\Controllers\Client\DashboardController::class, 'index'])
+        Route::get('/client/dashboard', [ClientDashboardController::class, 'index'])
             ->name('client.dashboard');
 
-        Route::get('/client/factures', [\App\Http\Controllers\Client\FactureController::class, 'index'])
+        Route::get('/client/factures', [ClientFactureController::class, 'index'])
             ->name('client.factures.index');
-        Route::get('/client/factures/{facture}', [\App\Http\Controllers\Client\FactureController::class, 'show'])
+        Route::get('/client/factures/export/excel', [ClientFactureController::class, 'exportExcel'])
+            ->name('client.factures.export.excel');
+        Route::get('/client/factures/export/pdf', [ClientFactureController::class, 'exportPdf'])
+            ->name('client.factures.export.pdf');
+        Route::get('/client/factures/{facture}', [ClientFactureController::class, 'show'])
             ->name('client.factures.show');
-        Route::get('/factures/{facture}/print', [FactureController::class, 'print'])
+        Route::get('/factures/{facture}/print', [ClientFactureController::class, 'print'])
             ->name('client.invoices.facture.print');
 
-        Route::get('/client/paiements', [\App\Http\Controllers\Client\PaiementController::class, 'index'])
+        Route::get('/client/paiements', [ClientPaiementController::class, 'index'])
             ->name('client.paiements.index');
-        // 🆕 Routes d'export
-        Route::get('/client/paiements/export/excel', [\App\Http\Controllers\Client\PaiementController::class, 'exportExcel'])
+        Route::get('/client/paiements/export/excel', [ClientPaiementController::class, 'exportExcel'])
             ->name('client.paiements.export.excel');
-        Route::get('/client/paiements/export/pdf', [\App\Http\Controllers\Client\PaiementController::class, 'exportPdf'])
+        Route::get('/client/paiements/export/pdf', [ClientPaiementController::class, 'exportPdf'])
             ->name('client.paiements.export.pdf');
-        Route::get('/client/paiements/print', [\App\Http\Controllers\Client\PaiementController::class, 'print'])
+        Route::get('/client/paiements/print', [ClientPaiementController::class, 'print'])
             ->name('client.paiements.print');
     });
 });
