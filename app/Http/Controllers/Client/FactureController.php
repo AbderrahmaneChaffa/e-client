@@ -120,6 +120,14 @@ class FactureController extends Controller
             });
         }
 
+        if ($request->filled('annee')) {
+            $query->whereYear('date_facture', (int) $request->input('annee'));
+        }
+
+        if ($request->filled('mois')) {
+            $query->whereMonth('date_facture', (int) $request->input('mois'));
+        }
+
         match ($request->input('statut')) {
             'payee', 'paye' => $query->where('annuler', false)->where('reste_a_payer', '<=', 0),
             'impayee', 'impaye' => $query->where('annuler', false)->where('reste_a_payer', '>', 0),
@@ -209,6 +217,8 @@ class FactureController extends Controller
             'numero' => ['nullable', 'string', 'max:120'],
             'statut' => ['nullable', 'in:payee,paye,impayee,impaye,annulee,en_retard'],
             'period' => ['nullable', 'in:today,week,month,custom'],
+            'annee' => ['nullable', 'integer', 'min:2000', 'max:2100'],
+            'mois' => ['nullable', 'integer', 'min:1', 'max:12'],
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date'],
             'montant_min' => ['nullable', 'numeric', 'min:0'],

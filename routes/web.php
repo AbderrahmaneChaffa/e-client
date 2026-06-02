@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\ImportController;
 use App\Http\Controllers\Client\DashboardController as ClientDashboardController;
 use App\Http\Controllers\Client\FactureController as ClientFactureController;
+use App\Http\Controllers\Client\SupportTicketController as ClientSupportTicketController;
 use App\Http\Controllers\Client\PaiementController as ClientPaiementController;
 use App\Http\Controllers\FactureController;
 use App\Http\Controllers\NotificationController;
@@ -106,6 +107,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('client.paiements.export.pdf');
         Route::get('/client/paiements/print', [ClientPaiementController::class, 'print'])
             ->name('client.paiements.print');
+
+        Route::get('/client/support', [ClientSupportTicketController::class, 'index'])
+            ->name('client.support.index');
+        Route::get('/client/support/create', [ClientSupportTicketController::class, 'create'])
+            ->name('client.support.create');
+        Route::post('/client/support', [ClientSupportTicketController::class, 'store'])
+            ->name('client.support.store');
     });
 });
 

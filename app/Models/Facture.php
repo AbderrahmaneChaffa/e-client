@@ -105,6 +105,14 @@ class Facture extends Model
         return $this->hasMany(Paiement::class);
     }
 
+    /**
+     * Tickets de support liés à cette facture.
+     */
+    public function supportTickets(): HasMany
+    {
+        return $this->hasMany(SupportTicket::class);
+    }
+
     public function importDiffs(): HasMany
     {
         return $this->hasMany(ImportDiff::class);

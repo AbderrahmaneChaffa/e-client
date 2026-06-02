@@ -35,4 +35,12 @@ class Client extends Model
     {
         return $this->hasMany(Facture::class);
     }
+
+    /**
+     * Tickets de support associés à ce client.
+     */
+    public function supportTickets(): HasMany
+    {
+        return $this->hasMany(SupportTicket::class);
+    }
 }

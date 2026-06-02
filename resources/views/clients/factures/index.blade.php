@@ -3,7 +3,7 @@
 {{-- // FILTERS: search, statut, period, date range, amount range, sort, direction, per_page --}}
 @php
     $pageTitle = 'Mes factures';
-    $filterKeys = ['search', 'numero', 'statut', 'period', 'date_from', 'date_to', 'montant_min', 'montant_max'];
+    $filterKeys = ['search', 'numero', 'statut', 'period', 'annee', 'mois', 'date_from', 'date_to', 'montant_min', 'montant_max'];
     $activeFilters = collect($filterKeys)->filter(fn ($key) => request()->filled($key))->count()
         + ((int) request('per_page', 25) !== 25 ? 1 : 0);
 
@@ -49,7 +49,7 @@
     };
 @endphp
 
-@extends('layouts.app')
+@extends('clients.layouts.app')
 @section('title', $pageTitle)
 
 @section('content')
@@ -79,8 +79,10 @@
     </section>
 
     <form x-ref="filters" method="GET" action="{{ route('client.factures.index') }}" class="ui-card p-4" @submit="filtering = true">
-        <input type="hidden" name="sort" value="{{ $sort }}">
-        <input type="hidden" name="direction" value="{{ $direction }}">
+    <input type="hidden" name="sort" value="{{ $sort }}">
+    <input type="hidden" name="direction" value="{{ $direction }}">
+    <input type="hidden" name="annee" value="{{ request('annee') }}">
+    <input type="hidden" name="mois" value="{{ request('mois') }}">
 
         <div class="grid grid-cols-1 gap-3 lg:grid-cols-12">
             <div class="lg:col-span-4">

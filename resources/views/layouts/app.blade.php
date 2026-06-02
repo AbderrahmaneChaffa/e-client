@@ -147,11 +147,11 @@
 
                     <div class="min-w-0 flex-1">
                         <div class="mx-auto max-w-xl">
-                            <label class="relative hidden md:block">
+                            {{-- <label class="relative hidden md:block">
                                 <span class="sr-only">Recherche globale</span>
                                 <i data-lucide="search" class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" aria-hidden="true"></i>
                                 <input x-ref="globalSearch" type="search" placeholder="Recherche globale (Ctrl+K)" class="ui-input h-10 pl-9">
-                            </label>
+                            </label> --}}
                         </div>
                     </div>
 

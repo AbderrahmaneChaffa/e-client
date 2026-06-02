@@ -35,6 +35,7 @@ const iconAliases = {
 };
 
 const iconPaths = {
+    'arrow-left': ['<path d="M19 12H5"/>', '<path d="m12 19-7-7 7-7"/>'],
     'arrow-down-right': ['<path d="M7 7l10 10"/>', '<path d="M17 7v10H7"/>'],
     'arrow-up-right': ['<path d="M7 17L17 7"/>', '<path d="M7 7h10v10"/>'],
     bell: ['<path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/>', '<path d="M10 21h4"/>'],
@@ -65,10 +66,12 @@ const iconPaths = {
     moon: ['<path d="M21 13a8 8 0 1 1-10-10 6.5 6.5 0 0 0 10 10Z"/>'],
     pencil: ['<path d="M12 20h9"/>', '<path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>'],
     plus: ['<path d="M12 5v14"/>', '<path d="M5 12h14"/>'],
+    'plus-circle': ['<circle cx="12" cy="12" r="9"/>', '<path d="M12 8v8"/>', '<path d="M8 12h8"/>'],
     printer: ['<path d="M6 9V3h12v6"/>', '<rect x="6" y="14" width="12" height="7"/>', '<rect x="3" y="9" width="18" height="8" rx="2"/>'],
     pulse: ['<path d="M3 12h4l3-8 4 16 3-8h4"/>'],
     'refresh-cw': ['<path d="M21 12a9 9 0 0 1-15 6.7"/>', '<path d="M3 12a9 9 0 0 1 15-6.7"/>', '<path d="M18 3v5h-5"/>', '<path d="M6 21v-5h5"/>'],
     'rotate-ccw': ['<path d="M3 12a9 9 0 1 0 3-6.7"/>', '<path d="M3 3v6h6"/>'],
+    send: ['<path d="m22 2-7 20-4-9-9-4Z"/>', '<path d="M22 2 11 13"/>'],
     search: ['<circle cx="11" cy="11" r="7"/>', '<path d="m21 21-4.3-4.3"/>'],
     'shield-check': ['<path d="M12 3 20 6v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/>', '<path d="m8.5 12 2.5 2.5 4.5-5"/>'],
     ship: ['<path d="M3 17h18l-2 4H5z"/>', '<path d="M7 17V7h10v10"/>', '<path d="M9 7V3h6v4"/>', '<path d="M8 11h2"/>', '<path d="M14 11h2"/>'],
@@ -160,6 +163,33 @@ window.appShell = function appShell() {
             document.documentElement.dataset.theme = this.isDark ? 'dark' : 'light';
             this.$dispatch('theme-changed', { dark: this.isDark });
             window.refreshLucideIcons();
+        },
+
+        trapMobileMenuFocus(event) {
+            if (!this.mobileMenuOpen || event.key !== 'Tab' || !this.$refs.mobileSidebar) {
+                return;
+            }
+
+            const focusables = [...this.$refs.mobileSidebar.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')]
+                .filter((element) => element.offsetParent !== null);
+
+            if (!focusables.length) {
+                return;
+            }
+
+            const first = focusables[0];
+            const last = focusables[focusables.length - 1];
+
+            if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault();
+                last.focus();
+                return;
+            }
+
+            if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault();
+                first.focus();
+            }
         },
     };
 };

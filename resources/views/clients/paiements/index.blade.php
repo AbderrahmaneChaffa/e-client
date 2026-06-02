@@ -29,7 +29,7 @@
     ])->filter();
 @endphp
 
-@extends('layouts.app')
+@extends('clients.layouts.app')
 @section('title', $pageTitle)
 
 @section('content')
