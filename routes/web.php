@@ -20,13 +20,13 @@ Route::get('/', function () {
         return redirect()->route('login');
     }
 
-    return Auth::user()->role === UserRole::ADMIN
+    return Auth::user()->hasAdminAccess()
         ? redirect()->route('admin.dashboard')
         : redirect()->route('client.dashboard');
 });
 
 Route::get('/dashboard', function () {
-    return Auth::user()->role === UserRole::ADMIN
+    return Auth::user()->hasAdminAccess()
         ? redirect()->route('admin.dashboard')
         : redirect()->route('client.dashboard');
 })->middleware(['auth', 'verified'])->name('dashboard');
@@ -43,7 +43,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::patch('/notifications/read-all', [NotificationController::class, 'markAllAsRead'])
         ->name('notifications.read-all');
 
-    Route::middleware('role:admin')->group(function () {
+    Route::middleware('role:admin,superadmin')->group(function () {
         Route::get('/admin/dashboard', [DashboardController::class, 'index'])
             ->name('admin.dashboard');
 
@@ -82,6 +82,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/admin/imports/store', [ImportController::class, 'storeFactures']);
 
         Route::resource('/admin/clients', ClientController::class, ['as' => 'admin']);
+    });
+
+    Route::middleware('role:admin,superadmin')->prefix('/admin/utilisateurs')->name('admin.users.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Admin\UserManagementController::class, 'index'])->name('index');
+        Route::get('/creer', [\App\Http\Controllers\Admin\UserManagementController::class, 'create'])->name('create');
+        Route::post('/', [\App\Http\Controllers\Admin\UserManagementController::class, 'store'])->name('store');
+        Route::get('/{user}/modifier', [\App\Http\Controllers\Admin\UserManagementController::class, 'edit'])->name('edit');
+        Route::put('/{user}', [\App\Http\Controllers\Admin\UserManagementController::class, 'update'])->name('update');
+        Route::delete('/{user}', [\App\Http\Controllers\Admin\UserManagementController::class, 'destroy'])->name('destroy');
+        Route::patch('/{user}/validation', [\App\Http\Controllers\Admin\UserManagementController::class, 'toggleValidation'])->name('toggle-validation');
     });
 
     Route::middleware('role:client')->group(function () {

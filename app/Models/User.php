@@ -7,8 +7,10 @@ namespace App\Models;
 use App\UserRole;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Arr;
 
 class User extends Authenticatable
 {
@@ -67,13 +69,43 @@ class User extends Authenticatable
         return $query->where('is_validated', true);
     }
 
-    public function client()
+    /**
+     * Filtre les utilisateurs par rôle ou collection de rôles.
+     *
+     * @param  UserRole|string|array<int, UserRole|string>  $role
+     */
+    public function scopeRole(Builder $query, UserRole|string|array $role): Builder
+    {
+        $roles = collect(Arr::wrap($role))
+            ->map(fn ($item) => $item instanceof UserRole ? $item->value : strtolower(trim((string) $item)))
+            ->filter(fn ($item) => $item !== '')
+            ->unique()
+            ->values();
+
+        return $roles->isEmpty()
+            ? $query
+            : $query->whereIn('role', $roles->all());
+    }
+
+    public function client(): BelongsTo
     {
         return $this->belongsTo(Client::class);
     }
 
-    public function isAdmin()
+    public function isSuperAdmin(): bool
     {
-        return $this->role === UserRole::ADMIN;
+        return $this->role === UserRole::SUPERADMIN
+            || strtolower((string) $this->getRawOriginal('role')) === UserRole::SUPERADMIN->value;
+    }
+
+    public function isAdmin(): bool
+    {
+        return $this->role === UserRole::ADMIN
+            || strtolower((string) $this->getRawOriginal('role')) === UserRole::ADMIN->value;
+    }
+
+    public function hasAdminAccess(): bool
+    {
+        return $this->isAdmin() || $this->isSuperAdmin();
     }
 }

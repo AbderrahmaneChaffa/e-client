@@ -2,11 +2,12 @@
     use Illuminate\Support\Facades\Route;
 
     $user = auth()->user();
-    $isAdmin = $user && method_exists($user, 'isAdmin') ? $user->isAdmin() : false;
+    $isAdmin = $user && method_exists($user, 'hasAdminAccess') ? $user->hasAdminAccess() : false;
     $pageTitle = $pageTitle ?? trim($__env->yieldContent('title')) ?: config('app.name', 'E-Client');
 
     $adminNav = [
         ['label' => 'Dashboard', 'route' => 'admin.dashboard', 'icon' => 'layout-dashboard', 'active' => 'admin.dashboard'],
+        ['label' => 'Utilisateurs', 'route' => 'admin.users.index', 'icon' => 'users', 'active' => 'admin.users.*'],
         ['label' => 'Clients', 'route' => 'admin.clients.index', 'icon' => 'users', 'active' => 'admin.clients.*'],
         ['label' => 'Factures', 'route' => 'admin.factures.index', 'icon' => 'file-text', 'active' => 'admin.factures.*'],
         ['label' => 'Paiements', 'route' => 'admin.paiements.index', 'icon' => 'credit-card', 'active' => 'admin.paiements.*'],
@@ -226,7 +227,8 @@
             </main>
         </div>
 
-        <nav class="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 backdrop-blur dark:border-gray-800 dark:bg-gray-950/95 md:hidden" aria-label="Navigation mobile">
+        @if(! $isAdmin)
+            <nav class="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 backdrop-blur dark:border-gray-800 dark:bg-gray-950/95 md:hidden" aria-label="Navigation mobile">
             <div class="grid grid-cols-4">
                 @foreach(array_slice($activeNav, 0, 4) as $item)
                     @if(Route::has($item['route']))
@@ -237,7 +239,8 @@
                     @endif
                 @endforeach
             </div>
-        </nav>
+            </nav>
+        @endif
 
         <x-flash-message />
     </div>

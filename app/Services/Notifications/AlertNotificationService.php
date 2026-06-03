@@ -518,7 +518,7 @@ class AlertNotificationService
         $payload['dedupe_key'] = $dedupeKey;
 
         User::query()
-            ->where('role', UserRole::ADMIN->value)
+            ->whereIn('role', [UserRole::ADMIN->value, UserRole::SUPERADMIN->value])
             ->select(['id', 'name', 'email', 'role', 'client_id'])
             ->chunkById(100, function (Collection $admins) use ($payload, $dedupeKey, &$sent): void {
                 foreach ($admins as $admin) {

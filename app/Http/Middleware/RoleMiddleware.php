@@ -15,9 +15,24 @@ class RoleMiddleware
      *
      * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
      */
-    public function handle($request, Closure $next, $role)
+    public function handle($request, Closure $next, ...$roles)
     {
-        if (!Auth::check() || Auth::user()->role !== UserRole::from(strtolower($role))) {
+        $allowedRoles = collect($roles)
+            ->flatMap(fn ($role) => preg_split('/[|,]/', (string) $role) ?: [])
+            ->map(fn ($role) => UserRole::tryFrom(strtolower(trim((string) $role))))
+            ->filter()
+            ->values();
+
+        if (! Auth::check() || $allowedRoles->isEmpty()) {
+            abort(403);
+        }
+
+        $rawRole = strtolower(trim((string) Auth::user()?->getRawOriginal('role')));
+        $currentRole = Auth::user()?->role instanceof UserRole
+            ? Auth::user()->role
+            : UserRole::tryFrom($rawRole);
+
+        if (! $currentRole || ! $allowedRoles->contains(fn (UserRole $allowedRole) => $allowedRole === $currentRole)) {
             abort(403);
         }
 

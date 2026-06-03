@@ -33,6 +33,24 @@
             <x-input-error :messages="$errors->get('name')" class="mt-2" />
 
             <div>
+                <label for="code_client" class="ui-label mb-1">Code client</label>
+                <input
+                    id="code_client"
+                    class="ui-input"
+                    type="text"
+                    name="code_client"
+                    value="{{ old('code_client') }}"
+                    required
+                    autocomplete="off"
+                    placeholder="Saisissez le code client fourni par EPO"
+                >
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Le compte sera lié au client correspondant a ce code. Un seul compte est autorise par client.
+                </p>
+                <x-input-error :messages="$errors->get('code_client')" class="mt-2" />
+            </div>
+
+            <div>
                 <label for="email" class="ui-label mb-1">Adresse email</label>
                 <input id="email" class="ui-input" type="email" name="email" value="{{ old('email') }}" required autocomplete="username">
                 <x-input-error :messages="$errors->get('email')" class="mt-2" />

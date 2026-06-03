@@ -27,6 +27,7 @@
         'missing' => ['label' => 'Manquant', 'class' => 'bg-danger-50 text-danger-700 ring-danger-600/20 dark:bg-danger-900/30 dark:text-danger-300', 'icon' => 'circle-off'],
         'inconsistent' => ['label' => 'Incohérent', 'class' => 'bg-danger-50 text-danger-700 ring-danger-600/20 dark:bg-danger-900/30 dark:text-danger-300', 'icon' => 'octagon-alert'],
         'admin' => ['label' => 'Admin', 'class' => 'bg-primary-50 text-primary-700 ring-primary-600/20 dark:bg-primary-900/30 dark:text-primary-300', 'icon' => 'shield'],
+        'superadmin' => ['label' => 'Superadmin', 'class' => 'bg-primary-50 text-primary-700 ring-primary-600/20 dark:bg-primary-900/30 dark:text-primary-300', 'icon' => 'shield'],
         'client' => ['label' => 'Client', 'class' => 'bg-slate-100 text-slate-700 ring-slate-500/20 dark:bg-slate-700 dark:text-slate-200', 'icon' => 'user'],
     ];
     $badge = $map[$key] ?? ['label' => ucfirst($key), 'class' => 'bg-slate-100 text-slate-700 ring-slate-500/20 dark:bg-slate-700 dark:text-slate-200', 'icon' => 'circle'];
