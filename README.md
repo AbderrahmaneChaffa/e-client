@@ -9,6 +9,7 @@ This README was generated from the repository source, migrations, route list, pa
 ## Table of Contents
 
 - [Project Overview](#project-overview)
+- [Recent Functional Updates](#recent-functional-updates)
 - [Business Context](#business-context)
 - [Core Features](#core-features)
 - [Technical Architecture](#technical-architecture)
@@ -52,6 +53,14 @@ This README was generated from the repository source, migrations, route list, pa
 - **Client users:** view their own invoices and payments, export payment history, print invoices, and receive invoice/payment notifications.
 
 **High-level application type:** Server-rendered Laravel web application using Blade, Alpine.js, Tailwind CSS, Chart.js, queued background jobs, MySQL, database notifications, and Excel/PDF libraries.
+
+### Recent Functional Updates
+
+- `superadmin` is now a first-class role in the codebase and routes can be shared with admins where appropriate.
+- Public registration now requires a `code_client` and creates an inactive client account linked to an existing client record.
+- Client users have a dedicated support ticket flow linked to invoices.
+- The client shell now uses a responsive sidebar with a minimal top bar.
+- Import files now have a configurable retention policy and cleanup/audit commands.
 
 ## Business Context
 
@@ -173,6 +182,72 @@ Important files:
 - `app/Http/Controllers/Client/PaiementController.php`
 - `app/Imports/PaiementsImport.php`
 - `app/Exports/Client/PaiementsExport.php`
+
+### Client Support Tickets
+
+Support tickets are stored in `support_tickets` and modeled by `App\Models\SupportTicket`.
+
+Implemented behavior:
+
+- client users can open a support ticket from an invoice detail page;
+- the support form can be pre-filled with `facture_id`;
+- ticket creation is restricted to the authenticated client's own invoices;
+- ticket status values are `ouvert`, `en_cours`, and `resolu`;
+- priority values are `normal` and `urgent`;
+- the client support area shows ticket history with filters and pagination.
+
+Important files:
+
+- `app/Http/Controllers/Client/SupportTicketController.php`
+- `app/Models/SupportTicket.php`
+- `resources/views/clients/support/*`
+- `resources/views/clients/factures/show.blade.php`
+
+### User Management and RBAC
+
+The application now formalizes `superadmin` alongside `admin` and `client`.
+
+Implemented behavior:
+
+- public registration requires a `code_client` that exists in `clients`;
+- registration creates a client account with `client_id` and `is_validated = false`;
+- Breeze login rejects non-validated accounts before the session is kept alive;
+- admins and superadmins can access the administrative user list;
+- only superadmins can create, edit, or delete users;
+- admins and superadmins can toggle validation status;
+- the last superadmin and the current user are protected from accidental deactivation;
+- the admin shell includes a dedicated "Gestion des utilisateurs" entry.
+
+Important files:
+
+- `app/UserRole.php`
+- `app/Models/User.php`
+- `app/Http/Middleware/RoleMiddleware.php`
+- `app/Http/Controllers/Auth/RegisteredUserController.php`
+- `app/Http/Controllers/Admin/UserManagementController.php`
+- `resources/views/admins/users/*`
+
+### Import File Retention and Audit
+
+The import subsystem now includes an explicit file lifecycle policy.
+
+Implemented behavior:
+
+- completed import files can be purged after a configurable retention period;
+- cleanup is available through `php artisan imports:cleanup`;
+- `--dry-run` lets operators simulate the cleanup before deleting anything;
+- `php artisan imports:audit-storage` reports orphaned files and missing files;
+- cleanup writes structured logs to a dedicated `imports-cleanup` channel;
+- import verification and diff history remain in the database after file deletion;
+- the import scheduler runs the cleanup command daily at 02:00 when enabled.
+
+Important files:
+
+- `app/Console/Commands/CleanupImportFiles.php`
+- `app/Console/Commands/AuditImportStorage.php`
+- `config/imports.php`
+- `config/logging.php`
+- `routes/console.php`
 
 ### Paid Invoices and Paid Prestations
 
@@ -960,6 +1035,7 @@ enum UserRole: string
 {
     case ADMIN = 'admin';
     case CLIENT = 'client';
+    case SUPERADMIN = 'superadmin';
 }
 ```
 
@@ -972,6 +1048,7 @@ Access:
 - import screens and import APIs;
 - global verification;
 - client CRUD;
+- user validation toggles;
 - admin notifications.
 
 Responsibilities:
@@ -980,6 +1057,7 @@ Responsibilities:
 - monitor import progress;
 - review import diffs and verification alerts;
 - manage clients;
+- validate or deactivate users;
 - inspect all invoices and payments.
 
 ### Client
@@ -991,6 +1069,7 @@ Access:
 - own payment index;
 - payment exports;
 - invoice print route;
+- support tickets linked to invoices;
 - client notifications.
 
 Responsibilities:
@@ -1001,23 +1080,26 @@ Responsibilities:
 
 ### Superadmin
 
-The live database inspected had `superadmin` in `users.role`, and `.env.example` has `SUPERADMIN_*` variables. However:
+Superadmin is now implemented in code and database casts.
 
-- `App\UserRole` does not define `SUPERADMIN`;
-- no superadmin middleware, controller logic, or seeder using `SUPERADMIN_*` was found;
-- route middleware only checks exact `admin` or `client`.
+Capabilities:
 
-Treat superadmin as **not implemented** until the enum, migrations, seeders, and access rules are reconciled.
+- same access as admin for dashboards, imports, invoices, payments, and notifications;
+- full user management CRUD;
+- user validation toggles;
+- client/user relationship enforcement during account creation;
+- protection against disabling the last superadmin or the currently logged-in account.
 
 ### Authorization Mechanism
 
-Implemented through `App\Http\Middleware\RoleMiddleware`:
+Implemented through `App\Http\Middleware\RoleMiddleware` and controller-level checks:
 
 - aliased as `role` in `bootstrap/app.php`;
-- compares `Auth::user()->role` to `UserRole::from(strtolower($role))`;
-- route groups use `role:admin` and `role:client`.
+- supports `role:admin,superadmin` style multi-role route guards;
+- normalizes string/enum role values before comparison;
+- uses manual checks for sensitive actions such as user CRUD and validation toggles.
 
-There are no policy classes in the repository. Client invoice access is manually checked in `Client\FactureController::authorizeFacture()`.
+There are still no policy classes in the repository. Client invoice access is manually checked in `Client\FactureController::authorizeFacture()`.
 
 ## Import System
 
@@ -1334,6 +1416,8 @@ Widgets and calculations:
 - weekly activity counts for invoices, payments, and clients;
 - data health summary from `ImportVerificationService::latestHealthSummary()`;
 - global verification cache status.
+- dashboard charts are rendered with Chart.js and can be extended to drill down into filtered invoice/payment lists;
+- the admin shell now includes the user-management entry and uses the same responsive shell conventions as the client layout.
 
 ### Client Dashboard
 
@@ -1356,7 +1440,9 @@ Widgets and calculations:
 - 12-month payment chart for the client's invoices;
 - recent invoices;
 - recent payments;
-- oldest unpaid invoices.
+- oldest unpaid invoices;
+- the payment list groups rows by cheque number and supports collapse/expand groups in the UI;
+- support ticket links are available from invoice detail pages.
 
 ## Notification System
 
@@ -1740,11 +1826,10 @@ The app uses standard Laravel web middleware and Blade forms with CSRF protectio
 
 ### Security Gaps to Watch
 
-- Registration is publicly enabled and creates users with the default `client` role but no `client_id`.
-- There are no policy classes.
-- Admin route access depends entirely on exact role matching.
-- `superadmin` is not implemented in `UserRole`.
-- Models do not currently use `SoftDeletes` despite `deleted_at` columns.
+- Public registration remains enabled, but it now requires a valid `code_client` and creates an inactive account linked to a client record.
+- There are still no policy classes.
+- Some older views and seeders may still assume only `admin` and `client`; keep enum/database/seed data aligned when adding new role-dependent code.
+- Models do not currently use `SoftDeletes` despite `deleted_at` columns. This is intentional for now and should only be changed with a deliberate data-retention decision.
 
 ## Local Development Setup
 
@@ -1786,6 +1871,9 @@ SESSION_DRIVER=redis
 QUEUE_CONNECTION=database
 CACHE_STORE=database
 MAIL_MAILER=log
+IMPORT_CLEANUP_ENABLED=true
+IMPORT_RETENTION_DAYS=30
+IMPORT_CLEANUP_SCHEDULE_AT=02:00
 ```
 
 Recommended local choices:
@@ -1899,6 +1987,9 @@ php artisan epo:diagnose-paiements path/to/paiements.xlsx
 php artisan epo:rebuild-hashes
 php artisan epo:analyze-logs
 php artisan notifications:sync-alerts
+php artisan imports:cleanup --dry-run
+php artisan imports:cleanup --force --days=30
+php artisan imports:audit-storage
 ```
 
 ## Dependencies
@@ -2043,17 +2134,17 @@ Migrations add indexes for:
 
 These items are inferred from repository source and current database inspection. Validate before changing production behavior.
 
-1. **Schema drift exists.** The live MySQL schema inspected did not include some later repository migration tables/columns such as `import_diffs`, `import_verifications`, notification tables, and row hash columns. It also contained `deletion_audits`, `users.is_validated`, `users.deleted_at`, and a `superadmin` role value that are not fully represented in repository code.
+1. **Schema drift can still exist between environments.** The repository now covers `users.is_validated`, `users.deleted_at`, and `superadmin`, but the live MySQL schema inspected during earlier analysis had still been ahead of or behind parts of the repository on some tables such as import diffs, verification history, and notification metadata. Re-check migrations before deployment.
 
-2. **Soft deletes are not enabled in models.** `clients`, `factures`, and `paiements` migrations add `deleted_at`, but `Client`, `Facture`, and `Paiement` do not use `SoftDeletes`. Deleting through Eloquent will hard-delete rows.
+2. **Soft deletes are not enabled in models.** `clients`, `factures`, and `paiements` migrations add `deleted_at`, but `Client`, `Facture`, and `Paiement` do not use `SoftDeletes`. Deleting through Eloquent will hard-delete rows unless that decision is intentionally changed.
 
-3. **Role enum mismatch.** The app enum only supports `admin` and `client`. Any existing `superadmin` value is not implemented and may cause enum casting/access issues.
+3. **Role enum drift has historically existed.** The code now supports `admin`, `client`, and `superadmin`, but older seeders or raw SQL fixtures may still contain mixed-case values such as `Admin` or `Client`. Keep any external data normalized to lowercase.
 
-4. **Public registration creates incomplete client users.** Registered users default to role `client` but are not attached to a `client_id`. Client dashboards and route access assume a client user has a valid `client_id`.
+4. **Registration depends on client master data.** Public sign-up now requires a valid `code_client` and creates a linked inactive account. Any drift in `clients.code_client` uniqueness will break that workflow.
 
-5. **Composer dev queue command may not process import jobs.** `composer.json` runs `php artisan queue:work --tries=1 --timeout=0`, but import jobs are queued on `imports`. Use `--queue=imports,default` or `start-worker.bat`.
+5. **Import cleanup is intentionally conservative.** The new `imports:cleanup` command only purges completed batches after the configured retention window and preserves audit metadata in `import_batches.metadata`.
 
-6. **`.env.example` references unimplemented Reverb/Go worker settings.** Reverb, Horizon, Laravel Echo, and a Go worker are not present in the active package metadata/source usage. Treat those env values as stale or planned until implemented.
+6. **Queue workers must listen to the imports queue.** When running manually, always use `--queue=imports,default` so queued import jobs are not stranded.
 
 7. **Paid file detection relies on filenames.** `ExcelTypeDetector::allSamplesMarkedPaid()` currently always returns false, so adaptive detection of paid facture files depends on filename markers such as `payee` / `payees` / `paye`.
 
@@ -2075,13 +2166,13 @@ Recommended next work:
 
 1. Reconcile database migrations with the live schema and remove or formalize drift.
 2. Add `SoftDeletes` to models where `deleted_at` exists, or remove soft delete columns if hard delete is intentional.
-3. Implement or remove `superadmin`, `is_validated`, and `SUPERADMIN_*` configuration.
-4. Gate public registration or require admin validation/client assignment before client dashboard access.
-5. Add model policies for invoices, clients, payments, imports, and notifications.
-6. Improve import preview to detect missing parent invoices before processing.
-7. Fix paid-file detection logic and add tests for adaptive paid-file detection.
-8. Add `date_echeance` import mapping or disable overdue notifications until due dates are populated.
-9. Add an import retention/cleanup policy for stored Excel files.
+3. Extend the user-management area with audit trails, bulk actions, or a dedicated validation queue if operations require it.
+4. Add model policies for invoices, clients, payments, imports, and notifications.
+5. Improve import preview to detect missing parent invoices before processing.
+6. Fix paid-file detection logic and add tests for adaptive paid-file detection.
+7. Add `date_echeance` import mapping or disable overdue notifications until due dates are populated.
+8. If long-term retention is required, add a compressed archive or cold-storage restore flow on top of the current cleanup policy.
+9. Keep aligning seeders, tests, and live data normalization whenever role or registration rules evolve.
 10. Add queue monitoring, retry strategy, and failed import recovery workflows.
 11. Consider Laravel Horizon only after Redis queue usage is intentionally adopted.
 12. Add integration tests for each import type and notification trigger.
