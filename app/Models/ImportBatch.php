@@ -3,6 +3,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -56,5 +57,31 @@ class ImportBatch extends Model
     {
         if ($this->total_rows === 0) return 0;
         return (int) min(100, round(($this->processed_rows / $this->total_rows) * 100));
+    }
+
+    public function scopeCompleted(Builder $query): Builder
+    {
+        return $query->where('status', 'completed')
+            ->whereNotNull('completed_at');
+    }
+
+    public function scopeCleanupCandidates(Builder $query, int $days, ?string $type = null): Builder
+    {
+        $query->completed()
+            ->where('completed_at', '<', now()->subDays(max(1, $days)));
+
+        if ($type !== null && $type !== '') {
+            $query->where('type', $type);
+        }
+
+        return $query;
+    }
+
+    public function markCleanupMetadata(array $attributes): void
+    {
+        $metadata = $this->metadata ?? [];
+        $this->forceFill([
+            'metadata' => array_merge($metadata, $attributes),
+        ])->save();
     }
 }

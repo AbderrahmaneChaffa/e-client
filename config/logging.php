@@ -81,6 +81,14 @@ return [
             'replace_placeholders' => true,
         ],
 
+        'imports-cleanup' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/imports-cleanup.log'),
+            'level' => env('IMPORTS_CLEANUP_LOG_LEVEL', 'info'),
+            'days' => (int) env('IMPORTS_CLEANUP_LOG_DAYS', 30),
+            'replace_placeholders' => true,
+        ],
+
         'slack' => [
             'driver' => 'slack',
             'url' => env('LOG_SLACK_WEBHOOK_URL'),
